@@ -1,0 +1,5 @@
+---
+source: crates/wikidata-fix/tests/integration.rs
+expression: unfixable_str
+---
+

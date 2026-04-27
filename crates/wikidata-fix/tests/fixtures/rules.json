@@ -1,0 +1,18 @@
+{
+  "nationalities_lower": ["palestinian", "irish"],
+  "misspellings": {"abandonned": "abandoned"},
+  "bad_starts_descriptions": ["the ", "It "],
+  "marketing_imperatives": ["Buy "],
+  "promotional_substrings": ["the best "],
+  "promotional_exempt_substrings": ["award"],
+  "trademark_chars": ["®", "™"],
+  "html_entity_substrings": ["&amp;", "&#91;", "&#93;"],
+  "multi_sentence_markers": [". The"],
+  "obituary_markers": ["Obituary"],
+  "skip_qids": {},
+  "excluded_p31_for_long_aliases": [],
+  "thresholds": {
+    "description_max_len": 50,
+    "descgust_score_threshold": 4
+  }
+}

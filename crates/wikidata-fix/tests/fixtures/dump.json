@@ -1,0 +1,20 @@
+[
+{"id":"Q01","labels":{"en":{"language":"en","value":"Foo"}},"descriptions":{"en":{"language":"en","value":"Foo is a thing"}}},
+{"id":"Q02","descriptions":{"en":{"language":"en","value":"the abandonned ship"}}},
+{"id":"Q03","descriptions":{"en":{"language":"en","value":"palestinian writer"}}},
+{"id":"Q04","descriptions":{"en":{"language":"en","value":"by an irish person"}}},
+{"id":"Q05","descriptions":{"en":{"language":"en","value":"foo® widget"}}},
+{"id":"Q06","descriptions":{"en":{"language":"en","value":"AT&amp;T thing"}}},
+{"id":"Q07","descriptions":{"en":{"language":"en","value":"foo  bar baz"}}},
+{"id":"Q08","descriptions":{"en":{"language":"en","value":"foo ,bar baz"}}},
+{"id":"Q09","descriptions":{"en":{"language":"en","value":"foo bar baz."}}},
+{"id":"Q10","descriptions":{"en":{"language":"en","value":"Capitalized example"}}},
+{"id":"Q11","descriptions":{"en":{"language":"en","value":"this very long description is over the configured fifty character threshold"}}},
+{"id":"Q12","descriptions":{"en":{"language":"en","value":"the simple foo"}}},
+{"id":"Q13","descriptions":{"en":{"language":"en","value":"Buy this widget"}}},
+{"id":"Q14","descriptions":{"en":{"language":"en","value":"the best widget around"}}},
+{"id":"Q15","descriptions":{"en":{"language":"en","value":"Obituary of foo"}}},
+{"id":"Q16","descriptions":{"en":{"language":"en","value":"x. The next"}}},
+{"id":"Q17","descriptions":{"en":{"language":"en","value":"foo® bar™  baz."}}},
+{"id":"Q18","claims":{"P31":[{"mainsnak":{"datavalue":{"value":{"id":"Q42"}}}}]},"aliases":{"en":[{"language":"en","value":"abbr"},{"language":"en","value":"a much longer alias"}]}}
+]

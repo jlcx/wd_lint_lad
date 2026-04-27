@@ -1,0 +1,35 @@
+---
+source: crates/wikidata-fix/tests/integration.rs
+expression: s
+---
+{"qid":"Q01","lang":"en","field":"description","check":"description.starts_with_label","value":"Foo is a thing","suggestion":"thing","details":null}
+{"qid":"Q01","lang":"en","field":"description","check":"description.starts_capitalized","value":"Foo is a thing","suggestion":null,"details":null}
+{"qid":"Q01","lang":"en","field":"description","check":"descriptions.long","value":"Foo is a thing","suggestion":null,"details":{"new_max_len":14}}
+{"qid":"Q02","lang":"en","field":"description","check":"description.bad_start","value":"the abandonned ship","suggestion":null,"details":null}
+{"qid":"Q02","lang":"en","field":"description","check":"description.misspelled","value":"the abandonned ship","suggestion":"the abandoned ship","details":null}
+{"qid":"Q02","lang":"en","field":"description","check":"descriptions.long","value":"the abandonned ship","suggestion":null,"details":{"new_max_len":19}}
+{"qid":"Q03","lang":"en","field":"description","check":"description.starts_with_lowercase_nationality","value":"palestinian writer","suggestion":"Palestinian writer","details":null}
+{"qid":"Q04","lang":"en","field":"description","check":"description.contains_lowercase_nationality","value":"by an irish person","suggestion":null,"details":null}
+{"qid":"Q05","lang":"en","field":"description","check":"description.contains_trademark","value":"foo® widget","suggestion":null,"details":null}
+{"qid":"Q06","lang":"en","field":"description","check":"description.starts_capitalized","value":"AT&amp;T thing","suggestion":null,"details":null}
+{"qid":"Q06","lang":"en","field":"description","check":"description.contains_html_entity","value":"AT&amp;T thing","suggestion":null,"details":null}
+{"qid":"Q07","lang":"en","field":"description","check":"description.contains_double_space","value":"foo  bar baz","suggestion":null,"details":null}
+{"qid":"Q08","lang":"en","field":"description","check":"description.space_before_comma","value":"foo ,bar baz","suggestion":null,"details":null}
+{"qid":"Q09","lang":"en","field":"description","check":"description.ends_with_punctuation","value":"foo bar baz.","suggestion":null,"details":null}
+{"qid":"Q10","lang":"en","field":"description","check":"description.starts_capitalized","value":"Capitalized example","suggestion":null,"details":null}
+{"qid":"Q11","lang":"en","field":"description","check":"description.too_long","value":"this very long description is over the configured fifty character threshold","suggestion":null,"details":null}
+{"qid":"Q11","lang":"en","field":"description","check":"descriptions.long","value":"this very long description is over the configured fifty character threshold","suggestion":null,"details":{"new_max_len":75}}
+{"qid":"Q12","lang":"en","field":"description","check":"description.bad_start","value":"the simple foo","suggestion":null,"details":null}
+{"qid":"Q13","lang":"en","field":"description","check":"description.starts_capitalized","value":"Buy this widget","suggestion":null,"details":null}
+{"qid":"Q13","lang":"en","field":"description","check":"description.marketing_imperative","value":"Buy this widget","suggestion":null,"details":null}
+{"qid":"Q14","lang":"en","field":"description","check":"description.bad_start","value":"the best widget around","suggestion":null,"details":null}
+{"qid":"Q14","lang":"en","field":"description","check":"description.promotional","value":"the best widget around","suggestion":null,"details":null}
+{"qid":"Q15","lang":"en","field":"description","check":"description.starts_capitalized","value":"Obituary of foo","suggestion":null,"details":null}
+{"qid":"Q15","lang":"en","field":"description","check":"description.contains_obituary","value":"Obituary of foo","suggestion":null,"details":null}
+{"qid":"Q16","lang":"en","field":"description","check":"description.multi_sentence","value":"x. The next","suggestion":null,"details":null}
+{"qid":"Q17","lang":"en","field":"description","check":"description.ends_with_punctuation","value":"foo® bar™  baz.","suggestion":null,"details":null}
+{"qid":"Q17","lang":"en","field":"description","check":"description.contains_trademark","value":"foo® bar™  baz.","suggestion":null,"details":null}
+{"qid":"Q17","lang":"en","field":"description","check":"description.contains_double_space","value":"foo® bar™  baz.","suggestion":null,"details":null}
+{"qid":"Q17","lang":"en","field":"description","check":"description.composite","value":"foo® bar™  baz.","suggestion":null,"details":["description.ends_with_punctuation","description.contains_trademark","description.contains_double_space"]}
+{"qid":"Q18","lang":"en","field":"alias","check":"aliases.long","value":"abbr","suggestion":null,"details":{"new_max_len":4}}
+{"qid":"Q18","lang":"en","field":"alias","check":"aliases.long","value":"a much longer alias","suggestion":null,"details":{"new_max_len":19}}

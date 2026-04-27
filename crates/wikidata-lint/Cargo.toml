@@ -1,0 +1,20 @@
+[package]
+name = "wikidata-lint"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Streams a Wikidata JSON dump and emits one JSONL record per detected label/description/alias issue."
+
+[[bin]]
+name = "wikidata-lint"
+path = "src/main.rs"
+
+[dependencies]
+wd-core = { path = "../wd-core" }
+aho-corasick = { workspace = true }
+anyhow = { workspace = true }
+clap = { workspace = true }
+crossbeam-channel = { workspace = true }
+serde_json = { workspace = true }

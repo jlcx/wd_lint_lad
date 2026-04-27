@@ -1,0 +1,37 @@
+{
+  "nationalities_lower": [
+    "american", "british", "canadian", "english", "french",
+    "german", "irish", "italian", "japanese", "mexican",
+    "palestine", "palestinian", "polish", "russian", "scottish",
+    "spanish", "swedish", "welsh"
+  ],
+  "misspellings": {
+    "abandonned": "abandoned",
+    "accomodate": "accommodate",
+    "definately": "definitely",
+    "occured": "occurred",
+    "publically": "publicly",
+    "recieved": "received",
+    "seperate": "separate",
+    "untill": "until"
+  },
+  "bad_starts_descriptions": ["a ", "an ", "the ", "It ", "is ", "http://"],
+  "marketing_imperatives": ["Discover ", "Enjoy ", "Indulge ", "Buy "],
+  "promotional_substrings": ["the best ", " finest ", "Christ-centered"],
+  "promotional_exempt_substrings": ["award"],
+  "trademark_chars": ["®", "™"],
+  "html_entity_substrings": ["&amp;", "&#91;", "&#93;"],
+  "multi_sentence_markers": [". The", ". A ", ". An "],
+  "obituary_markers": ["Obituary"],
+  "skip_qids": {
+    "promotional": ["Q749290"],
+    "long_aliases": ["Q633110", "Q892935"],
+    "long_descriptions": ["Q31", "Q8", "P131"],
+    "multi_sentence": ["Q749290"]
+  },
+  "excluded_p31_for_long_aliases": ["Q13442814", "Q4167410"],
+  "thresholds": {
+    "description_max_len": 140,
+    "descgust_score_threshold": 4
+  }
+}

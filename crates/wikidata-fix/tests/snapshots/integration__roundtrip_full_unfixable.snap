@@ -1,0 +1,25 @@
+---
+source: crates/wikidata-fix/tests/integration.rs
+expression: unfixable_str
+---
+{"qid":"Q01","lang":"en","field":"description","check":"description.starts_with_label","value":"Foo is a thing","suggestion":"thing","details":null,"reason":"detection_only"}
+{"qid":"Q01","lang":"en","field":"description","check":"description.starts_capitalized","value":"Foo is a thing","suggestion":null,"details":null,"reason":"detection_only"}
+{"qid":"Q01","lang":"en","field":"description","check":"descriptions.long","value":"Foo is a thing","suggestion":null,"details":{"new_max_len":14},"reason":"detection_only"}
+{"qid":"Q02","lang":"en","field":"description","check":"description.bad_start","value":"the abandonned ship","suggestion":null,"details":null,"reason":"detection_only"}
+{"qid":"Q02","lang":"en","field":"description","check":"description.misspelled","value":"the abandonned ship","suggestion":"the abandoned ship","details":null,"reason":"detection_only"}
+{"qid":"Q02","lang":"en","field":"description","check":"descriptions.long","value":"the abandonned ship","suggestion":null,"details":{"new_max_len":19},"reason":"detection_only"}
+{"qid":"Q06","lang":"en","field":"description","check":"description.starts_capitalized","value":"AT&amp;T thing","suggestion":null,"details":null,"reason":"detection_only"}
+{"qid":"Q06","lang":"en","field":"description","check":"description.contains_html_entity","value":"AT&amp;T thing","suggestion":null,"details":null,"reason":"detection_only"}
+{"qid":"Q10","lang":"en","field":"description","check":"description.starts_capitalized","value":"Capitalized example","suggestion":null,"details":null,"reason":"detection_only"}
+{"qid":"Q11","lang":"en","field":"description","check":"description.too_long","value":"this very long description is over the configured fifty character threshold","suggestion":null,"details":null,"reason":"detection_only"}
+{"qid":"Q11","lang":"en","field":"description","check":"descriptions.long","value":"this very long description is over the configured fifty character threshold","suggestion":null,"details":{"new_max_len":75},"reason":"detection_only"}
+{"qid":"Q12","lang":"en","field":"description","check":"description.bad_start","value":"the simple foo","suggestion":null,"details":null,"reason":"detection_only"}
+{"qid":"Q13","lang":"en","field":"description","check":"description.starts_capitalized","value":"Buy this widget","suggestion":null,"details":null,"reason":"detection_only"}
+{"qid":"Q13","lang":"en","field":"description","check":"description.marketing_imperative","value":"Buy this widget","suggestion":null,"details":null,"reason":"detection_only"}
+{"qid":"Q14","lang":"en","field":"description","check":"description.bad_start","value":"the best widget around","suggestion":null,"details":null,"reason":"detection_only"}
+{"qid":"Q14","lang":"en","field":"description","check":"description.promotional","value":"the best widget around","suggestion":null,"details":null,"reason":"detection_only"}
+{"qid":"Q15","lang":"en","field":"description","check":"description.starts_capitalized","value":"Obituary of foo","suggestion":null,"details":null,"reason":"detection_only"}
+{"qid":"Q15","lang":"en","field":"description","check":"description.contains_obituary","value":"Obituary of foo","suggestion":null,"details":null,"reason":"detection_only"}
+{"qid":"Q16","lang":"en","field":"description","check":"description.multi_sentence","value":"x. The next","suggestion":null,"details":null,"reason":"detection_only"}
+{"qid":"Q18","lang":"en","field":"alias","check":"aliases.long","value":"abbr","suggestion":null,"details":{"new_max_len":4},"reason":"detection_only"}
+{"qid":"Q18","lang":"en","field":"alias","check":"aliases.long","value":"a much longer alias","suggestion":null,"details":{"new_max_len":19},"reason":"detection_only"}

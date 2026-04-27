@@ -1,0 +1,12 @@
+---
+source: crates/wikidata-fix/tests/integration.rs
+expression: csv_str
+---
+qid,Den,notes
+Q03,Palestinian writer,description.starts_with_lowercase_nationality
+Q04,by an Irish person,description.contains_lowercase_nationality
+Q05,foo widget,description.contains_trademark
+Q07,foo bar baz,description.contains_double_space
+Q08,"foo,bar baz",description.space_before_comma
+Q09,foo bar baz,description.ends_with_punctuation
+Q17,foo bar baz,description.composite;description.contains_double_space;description.contains_trademark;description.ends_with_punctuation
