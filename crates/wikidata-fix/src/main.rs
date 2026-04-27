@@ -59,9 +59,8 @@ fn main() -> ExitCode {
 
     let result = coalesce::process(issues, parse_failures, &config);
 
-    let stdout = io::stdout();
-    if let Err(e) = csv_out::write(BufWriter::new(stdout), &result, cli.annotate) {
-        eprintln!("error: {e}");
+    if let Err(e) = csv_out::write_split(&cli.output_dir, &result) {
+        eprintln!("error: writing CSVs to {}: {e}", cli.output_dir.display());
         return ExitCode::from(EXIT_IO);
     }
 

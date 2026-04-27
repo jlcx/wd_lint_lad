@@ -30,6 +30,12 @@
     "multi_sentence": ["Q749290"]
   },
   "excluded_p31_for_long_aliases": ["Q13442814", "Q4167410"],
+  "ends_with_punctuation_exempt_suffixes": [
+    "Inc.", "Ltd.", "Corp.", "Co.", "LLC.", "PLC.",
+    "Jr.", "Sr.", "St.", "Dr.", "Mr.", "Mrs.", "Ms.", "Prof.",
+    "etc.", "et al.",
+    "U.S.", "U.K.", "U.S.S.R.", "U.A.E."
+  ],
   "thresholds": {
     "description_max_len": 140,
     "descgust_score_threshold": 4

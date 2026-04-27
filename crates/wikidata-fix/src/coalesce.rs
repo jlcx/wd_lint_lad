@@ -8,7 +8,7 @@
 //! order), with columns `qid`, then `L<lang>`/`D<lang>`/`A<lang>`
 //! sorted alphabetically.
 
-use std::collections::{BTreeSet, HashMap, HashSet};
+use std::collections::{HashMap, HashSet};
 
 use serde::Serialize;
 use wd_core::{Field, Issue};
@@ -24,11 +24,19 @@ pub struct ProcessConfig {
 
 #[derive(Debug)]
 pub struct ProcessResult {
-    pub header: Vec<String>,
-    pub rows: Vec<Vec<String>>,
-    pub annotations: Vec<String>,
+    /// One entry per emitted cell. Order is the first-seen order of
+    /// the underlying `(qid, lang, field)` group, which matches input
+    /// order from the scanner.
+    pub cells: Vec<CellOut>,
     pub unfixable: Vec<UnfixableEntry>,
     pub suppressed_count: usize,
+}
+
+#[derive(Debug, Clone)]
+pub struct CellOut {
+    pub qid: String,
+    pub column: String,
+    pub value: String,
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -60,13 +68,8 @@ pub fn process(issues: Vec<Issue>, parse_failures: Vec<String>, config: &Process
     // Stage 1 — group + apply fixes per group, preserving group input order.
     let mut groups: Vec<GroupState> = Vec::new();
     let mut group_index: HashMap<(String, String, Field), usize> = HashMap::new();
-    let mut qid_order: Vec<String> = Vec::new();
-    let mut qid_seen: HashSet<String> = HashSet::new();
 
     for issue in issues {
-        if qid_seen.insert(issue.qid.clone()) {
-            qid_order.push(issue.qid.clone());
-        }
         let key = (issue.qid.clone(), issue.lang.clone(), issue.field);
         if let Some(&idx) = group_index.get(&key) {
             apply_one(&mut groups[idx], issue, config);
@@ -87,8 +90,9 @@ pub fn process(issues: Vec<Issue>, parse_failures: Vec<String>, config: &Process
         }
     }
 
-    // Collect cell results + unfixable from groups.
-    let mut cells: Vec<GroupState> = Vec::new();
+    // Walk groups in first-seen order. For each survivor, emit a CellOut.
+    // For each rejected, route its issues to the unfixable report.
+    let mut cells: Vec<CellOut> = Vec::new();
     let mut unfixable: Vec<UnfixableEntry> = parse_failures
         .into_iter()
         .map(|raw| UnfixableEntry::Unparsed {
@@ -130,52 +134,15 @@ pub fn process(issues: Vec<Issue>, parse_failures: Vec<String>, config: &Process
             suppressed_count += 1;
             continue;
         }
-        cells.push(g);
-    }
-
-    // Stage 2 — assemble rows.
-    let mut by_qid: HashMap<String, HashMap<String, (String, Vec<String>)>> = HashMap::new();
-    let mut all_columns: BTreeSet<String> = BTreeSet::new();
-    for cell in &cells {
-        let col_name = column_name(cell.field, &cell.lang);
-        all_columns.insert(col_name.clone());
-        by_qid
-            .entry(cell.qid.clone())
-            .or_default()
-            .insert(col_name, (cell.working.clone(), cell.contributing_checks.clone()));
-    }
-
-    let mut header = vec!["qid".to_string()];
-    header.extend(all_columns);
-
-    let mut rows = Vec::new();
-    let mut annotations = Vec::new();
-    for qid in qid_order {
-        let Some(cell_map) = by_qid.remove(&qid) else {
-            continue;
-        };
-        let mut row = Vec::with_capacity(header.len());
-        row.push(qid);
-        let mut row_checks: BTreeSet<String> = BTreeSet::new();
-        for col_name in &header[1..] {
-            if let Some((value, checks)) = cell_map.get(col_name) {
-                row.push(value.clone());
-                for c in checks {
-                    row_checks.insert(c.clone());
-                }
-            } else {
-                row.push(String::new());
-            }
-        }
-        rows.push(row);
-        let notes: Vec<String> = row_checks.into_iter().collect();
-        annotations.push(notes.join(";"));
+        cells.push(CellOut {
+            qid: g.qid,
+            column: column_name(g.field, &g.lang),
+            value: g.working,
+        });
     }
 
     ProcessResult {
-        header,
-        rows,
-        annotations,
+        cells,
         unfixable,
         suppressed_count,
     }
@@ -260,7 +227,7 @@ mod tests {
     }
 
     #[test]
-    fn single_misspelled_produces_one_row_one_column() {
+    fn single_misspelled_produces_one_cell() {
         let issues = vec![issue(
             "Q1",
             "en",
@@ -269,9 +236,10 @@ mod tests {
             Some("the abandoned ship"),
         )];
         let r = process(issues, vec![], &config());
-        assert_eq!(r.header, vec!["qid", "Den"]);
-        assert_eq!(r.rows.len(), 1);
-        assert_eq!(r.rows[0], vec!["Q1", "the abandoned ship"]);
+        assert_eq!(r.cells.len(), 1);
+        assert_eq!(r.cells[0].qid, "Q1");
+        assert_eq!(r.cells[0].column, "Den");
+        assert_eq!(r.cells[0].value, "the abandoned ship");
         assert!(r.unfixable.is_empty());
     }
 
@@ -282,7 +250,7 @@ mod tests {
             issue("Q1", "en", "description.too_long", "foo bar", None),
         ];
         let r = process(issues, vec![], &config());
-        assert!(r.rows.is_empty());
+        assert!(r.cells.is_empty());
         assert_eq!(r.unfixable.len(), 2);
         for entry in &r.unfixable {
             match entry {
@@ -304,7 +272,7 @@ mod tests {
             Some("abcdefghi"),
         )];
         let r = process(issues, vec![], &cfg);
-        assert!(r.rows.is_empty());
+        assert!(r.cells.is_empty());
         assert_eq!(r.unfixable.len(), 1);
         match &r.unfixable[0] {
             UnfixableEntry::Parsed { reason, .. } => assert_eq!(reason, "safety_bounds"),
@@ -323,7 +291,7 @@ mod tests {
             Some("the abandoned ship"),
         )];
         let r = process(issues, vec![], &config());
-        assert!(r.rows.is_empty());
+        assert!(r.cells.is_empty());
         assert!(r.unfixable.is_empty());
         assert_eq!(r.suppressed_count, 1);
     }
@@ -349,25 +317,23 @@ mod tests {
             issue("Q3", "en", "description.misspelled", "z", Some("zz")),
         ];
         let r = process(issues, vec![], &config());
-        assert_eq!(r.rows.len(), 3);
-        assert_eq!(r.rows[0][0], "Q2");
-        assert_eq!(r.rows[1][0], "Q1");
-        assert_eq!(r.rows[2][0], "Q3");
+        assert_eq!(r.cells.len(), 3);
+        assert_eq!(r.cells[0].qid, "Q2");
+        assert_eq!(r.cells[1].qid, "Q1");
+        assert_eq!(r.cells[2].qid, "Q3");
     }
 
     #[test]
-    fn columns_sorted_alphabetically_after_qid() {
+    fn distinct_columns_get_distinct_cells() {
         let issues = vec![
             issue("Q1", "en-gb", "description.misspelled", "a", Some("aa")),
             issue("Q1", "en", "description.misspelled", "b", Some("bb")),
         ];
         let r = process(issues, vec![], &config());
-        assert_eq!(r.header, vec!["qid", "Den", "Den-gb"]);
-        // The Q1 row has values for both columns.
-        assert_eq!(r.rows.len(), 1);
-        assert_eq!(r.rows[0][0], "Q1");
-        assert_eq!(r.rows[0][1], "bb"); // Den
-        assert_eq!(r.rows[0][2], "aa"); // Den-gb
+        assert_eq!(r.cells.len(), 2);
+        // Each cell carries its own (qid, column, value) — no sparse columns.
+        assert!(r.cells.iter().any(|c| c.column == "Den" && c.value == "bb"));
+        assert!(r.cells.iter().any(|c| c.column == "Den-gb" && c.value == "aa"));
     }
 
     #[test]
@@ -392,23 +358,7 @@ mod tests {
             details: None,
         };
         let r = process(vec![i1, i2], vec![], &config());
-        assert_eq!(r.rows.len(), 1);
-        assert_eq!(r.rows[0][1], "foo bar");
-    }
-
-    #[test]
-    fn annotations_carry_contributing_check_ids() {
-        let i1 = Issue {
-            qid: "Q1".into(),
-            lang: "en".into(),
-            field: Field::Description,
-            check: "description.contains_trademark".into(),
-            value: "foo™ bar".into(),
-            suggestion: None,
-            details: None,
-        };
-        let r = process(vec![i1], vec![], &config());
-        assert_eq!(r.annotations.len(), 1);
-        assert_eq!(r.annotations[0], "description.contains_trademark");
+        assert_eq!(r.cells.len(), 1);
+        assert_eq!(r.cells[0].value, "foo bar");
     }
 }

@@ -135,25 +135,33 @@ for `aliases.long`/`descriptions.long`, otherwise `null`.
 
 ## `wikidata-fix` — the fixer
 
-Reads scanner JSONL on stdin and emits a QuickStatements v2 / CSV batch
-on stdout.
+Reads scanner JSONL on stdin and emits **one CSV per `(field, lang)`
+column** into a directory you specify via `--output-dir`. Each file has
+the shape `qid,<column>` with rows only for items that have a fix for
+that specific column. No empty cells anywhere.
+
+This shape sidesteps QuickStatements' CSV importer, which interprets
+empty `Lxx` / `Dxx` / `Axx` cells as "set this field to empty"
+— destructively blanking unrelated fields if you fed it a single
+sparse CSV.
 
 ### Flags
 
 | Flag | Default | Meaning |
 |---|---|---|
 | `--rules <path>` | required | Same rules file the scanner used. |
+| `--output-dir <path>` | required | Directory to write per-column CSVs into. Created if missing. |
 | `--enable <ids>` | all fixable | Comma-separated check IDs to enable. |
 | `--disable <ids>` | none | Comma-separated check IDs to disable from the enabled set. |
 | `--unfixable <path>` | discard with stderr count | Path for the unfixable-report JSONL. |
-| `--annotate` | off | Append a trailing `notes` column listing contributing check IDs. |
 
 ### Coalescing
 
 The fixer groups input records by `(qid, lang, field)` and applies each
-applicable fix to a shared working string in input order, then groups
-the resulting cells by `qid` into one CSV row per item with columns
-`qid`, then `L<lang>` / `D<lang>` / `A<lang>` sorted alphabetically.
+applicable fix to a shared working string in input order. Each
+surviving group becomes one row in the CSV file named after its column
+(`Den.csv` for `(description, en)`, `Den-gb.csv` for `(description,
+en-gb)`, `Lfr.csv` for `(label, fr)`, etc.).
 
 **A group is all-or-nothing.** If any record in a group is
 detection-only or rejected by the safety pass, the *entire* group is
@@ -197,10 +205,16 @@ zcat latest-all.json.gz \
   > fixable.jsonl
 
 ./target/release/wikidata-fix --rules rules/example.json \
-    --unfixable skipped.jsonl --annotate \
-  < fixable.jsonl \
-  > batch.csv
+    --output-dir batches/ \
+    --unfixable skipped.jsonl \
+  < fixable.jsonl
 ```
+
+`batches/` will contain one file per `(field, lang)` combination —
+`batches/Den.csv`, `batches/Den-gb.csv`, etc. **Paste each file into
+QuickStatements separately, using its CSV import.** Each file is dense
+(no empty cells), so nothing outside what you intended to fix gets
+touched.
 
 **Or scan everything first, filter later** (keeps the full report for
 review; useful when you also want detection-only findings):
@@ -228,12 +242,12 @@ jq -c 'select(.check as $c | [
     "description.composite"
   ] | index($c))' issues.jsonl \
   | ./target/release/wikidata-fix --rules rules/example.json \
-      --unfixable skipped.jsonl --annotate \
-  > batch.csv
+      --output-dir batches/ \
+      --unfixable skipped.jsonl
 ```
 
 Human review is expected between the JSONL and the QuickStatements
-batch — `grep`, `jq`, sort, hand-edit, drop rows you don't want.
+batches — `grep`, `jq`, sort, hand-edit, drop rows you don't want.
 
 ## Rules file
 
@@ -256,6 +270,13 @@ Notable knobs:
   Exceptions: `misspellings` (literal / lowercased / capfirst forms
   tried in order) and `promotional_exempt_substrings`
   (case-insensitive).
+- `ends_with_punctuation_exempt_suffixes` — literal end-of-description
+  suffixes that exempt a value from `description.ends_with_punctuation`
+  (e.g. `"Inc."`, `"Ltd."`, `"Jr."`). Case-sensitive end-of-string
+  match. Defaults to empty if omitted. Independent of this list, a
+  description ending with `)` whose `(`/`)` are balanced overall is
+  always exempt — common Wikidata pattern for disambiguation, e.g.
+  `"ABC (band)"`.
 
 ## Exit codes
 

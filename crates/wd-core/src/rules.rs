@@ -19,6 +19,12 @@ pub struct Rules {
     pub skip_qids: HashMap<String, HashSet<String>>,
     #[serde(default)]
     pub excluded_p31_for_long_aliases: HashSet<String>,
+    /// End-of-description literal suffixes that exempt a value from
+    /// `description.ends_with_punctuation` (e.g. "Inc.", "Ltd."). Empty
+    /// by default. The balanced-parenthesis exemption is hardcoded and
+    /// not configured here.
+    #[serde(default)]
+    pub ends_with_punctuation_exempt_suffixes: Vec<String>,
     pub thresholds: Thresholds,
 }
 

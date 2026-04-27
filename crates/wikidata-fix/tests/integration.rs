@@ -35,14 +35,15 @@ fn run_scanner(rules: &Path, dump: Vec<u8>, checks: Option<&str>) -> Vec<u8> {
     output.stdout
 }
 
-fn run_fixer(rules: &Path, jsonl: Vec<u8>, unfixable_path: &Path) -> Vec<u8> {
+fn run_fixer(rules: &Path, jsonl: Vec<u8>, output_dir: &Path, unfixable_path: &Path) {
     let output = Command::cargo_bin("wikidata-fix")
         .unwrap()
         .arg("--rules")
         .arg(rules)
+        .arg("--output-dir")
+        .arg(output_dir)
         .arg("--unfixable")
         .arg(unfixable_path)
-        .arg("--annotate")
         .write_stdin(jsonl)
         .output()
         .unwrap();
@@ -52,7 +53,30 @@ fn run_fixer(rules: &Path, jsonl: Vec<u8>, unfixable_path: &Path) -> Vec<u8> {
         output.status,
         String::from_utf8_lossy(&output.stderr)
     );
-    output.stdout
+}
+
+/// Concatenate the per-column CSV files in `dir`, sorted by filename,
+/// with `===== <name> =====` separators, into a single deterministic
+/// string for snapshotting.
+fn read_split_csvs(dir: &Path) -> String {
+    let mut entries: Vec<_> = std::fs::read_dir(dir)
+        .unwrap()
+        .map(|e| e.unwrap())
+        .map(|e| {
+            let name = e.file_name().to_string_lossy().into_owned();
+            let body = std::fs::read_to_string(e.path()).unwrap();
+            (name, body)
+        })
+        .collect();
+    entries.sort_by(|a, b| a.0.cmp(&b.0));
+    let mut out = String::new();
+    for (name, body) in entries {
+        out.push_str("===== ");
+        out.push_str(&name);
+        out.push_str(" =====\n");
+        out.push_str(&body);
+    }
+    out
 }
 
 #[test]
@@ -73,9 +97,11 @@ fn roundtrip_filtered_to_fixable_produces_clean_csv() {
 
     let scanner_out = run_scanner(&rules, dump, Some(FIXABLE_CHECKS));
 
+    let output_dir = tempfile::tempdir().unwrap();
     let unfixable = tempfile::NamedTempFile::new().unwrap();
-    let csv = run_fixer(&rules, scanner_out, unfixable.path());
-    let csv_str = String::from_utf8(csv).unwrap();
+    run_fixer(&rules, scanner_out, output_dir.path(), unfixable.path());
+
+    let csv_str = read_split_csvs(output_dir.path());
     insta::assert_snapshot!("roundtrip_filtered_csv", csv_str);
 
     let unfixable_str = std::fs::read_to_string(unfixable.path()).unwrap();
@@ -90,9 +116,11 @@ fn roundtrip_full_scanner_routes_mixed_groups_to_unfixable() {
 
     let scanner_out = run_scanner(&rules, dump, None);
 
+    let output_dir = tempfile::tempdir().unwrap();
     let unfixable = tempfile::NamedTempFile::new().unwrap();
-    let csv = run_fixer(&rules, scanner_out, unfixable.path());
-    let csv_str = String::from_utf8(csv).unwrap();
+    run_fixer(&rules, scanner_out, output_dir.path(), unfixable.path());
+
+    let csv_str = read_split_csvs(output_dir.path());
     insta::assert_snapshot!("roundtrip_full_csv", csv_str);
 
     let unfixable_str = std::fs::read_to_string(unfixable.path()).unwrap();

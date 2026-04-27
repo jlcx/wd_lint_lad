@@ -53,11 +53,41 @@ pub(super) fn pred_starts_capitalized(value: &str) -> bool {
     value.chars().next().is_some_and(|c| c.is_uppercase())
 }
 
-pub(super) fn pred_ends_with_punctuation(value: &str) -> bool {
-    value
-        .chars()
-        .next_back()
-        .is_some_and(|c| c.is_ascii_punctuation())
+pub(super) fn pred_ends_with_punctuation(value: &str, exempt_suffixes: &[String]) -> bool {
+    let Some(last) = value.chars().next_back() else {
+        return false;
+    };
+    if !last.is_ascii_punctuation() {
+        return false;
+    }
+    // Exemption: balanced `(`/`)` and the description happens to end at a
+    // closing paren — common Wikidata pattern, e.g. "ABC (band)".
+    if last == ')' && has_balanced_parens(value) {
+        return false;
+    }
+    // Exemption: configured literal end-of-description suffixes,
+    // e.g. "Inc.", "Ltd.", honorifics like "Jr.".
+    if exempt_suffixes.iter().any(|s| value.ends_with(s.as_str())) {
+        return false;
+    }
+    true
+}
+
+fn has_balanced_parens(s: &str) -> bool {
+    let mut depth: i32 = 0;
+    for c in s.chars() {
+        match c {
+            '(' => depth += 1,
+            ')' => {
+                depth -= 1;
+                if depth < 0 {
+                    return false;
+                }
+            }
+            _ => {}
+        }
+    }
+    depth == 0
 }
 
 pub(super) fn pred_bad_start(value: &str, prefixes: &[String]) -> bool {
@@ -154,9 +184,10 @@ pub fn starts_capitalized(entity: &Entity, _ctx: &CheckCtx<'_>, out: &mut Vec<Is
     }
 }
 
-pub fn ends_with_punctuation(entity: &Entity, _ctx: &CheckCtx<'_>, out: &mut Vec<Issue>) {
+pub fn ends_with_punctuation(entity: &Entity, ctx: &CheckCtx<'_>, out: &mut Vec<Issue>) {
+    let exempts = &ctx.compiled.ends_with_punctuation_exempt_suffixes;
     for (lang, mt) in english_descs(entity) {
-        if pred_ends_with_punctuation(&mt.value) {
+        if pred_ends_with_punctuation(&mt.value, exempts) {
             emit(
                 out,
                 entity,
@@ -483,7 +514,7 @@ pub fn composite(entity: &Entity, ctx: &CheckCtx<'_>, out: &mut Vec<Issue>) {
             score += 1;
             details.push("description.starts_with_label".into());
         }
-        if pred_ends_with_punctuation(value) {
+        if pred_ends_with_punctuation(value, &ctx.compiled.ends_with_punctuation_exempt_suffixes) {
             score += 1;
             details.push("description.ends_with_punctuation".into());
         }
@@ -685,6 +716,81 @@ mod tests {
             super::starts_capitalized,
         );
         assert!(issues.is_empty());
+    }
+
+    #[test]
+    fn ends_with_punctuation_exempts_balanced_parens() {
+        // Balanced parens — exempt.
+        let issues = run(
+            empty_rules(),
+            serde_json::json!({
+                "id": "Q1",
+                "descriptions": {"en": {"language":"en","value":"Acme Corp (band)"}}
+            }),
+            super::ends_with_punctuation,
+        );
+        assert!(issues.is_empty());
+
+        // Unbalanced — still flagged.
+        let issues = run(
+            empty_rules(),
+            serde_json::json!({
+                "id": "Q1",
+                "descriptions": {"en": {"language":"en","value":"foo (a)) extra)"}}
+            }),
+            super::ends_with_punctuation,
+        );
+        assert_eq!(issues.len(), 1);
+
+        // Bare trailing close-paren with no opener — flagged.
+        let issues = run(
+            empty_rules(),
+            serde_json::json!({
+                "id": "Q1",
+                "descriptions": {"en": {"language":"en","value":"foo)"}}
+            }),
+            super::ends_with_punctuation,
+        );
+        assert_eq!(issues.len(), 1);
+    }
+
+    #[test]
+    fn ends_with_punctuation_exempts_configured_suffixes() {
+        let mut rules = empty_rules();
+        rules.ends_with_punctuation_exempt_suffixes = vec!["Inc.".into(), "Jr.".into()];
+
+        // "Inc." is in the list — exempt.
+        let issues = run(
+            rules.clone(),
+            serde_json::json!({
+                "id": "Q1",
+                "descriptions": {"en": {"language":"en","value":"Acme Inc."}}
+            }),
+            super::ends_with_punctuation,
+        );
+        assert!(issues.is_empty());
+
+        // Suffix list is case-sensitive — "INC." does NOT match "Inc.".
+        let issues = run(
+            rules.clone(),
+            serde_json::json!({
+                "id": "Q1",
+                "descriptions": {"en": {"language":"en","value":"ACME INC."}}
+            }),
+            super::ends_with_punctuation,
+        );
+        assert_eq!(issues.len(), 1);
+
+        // Suffix not in list — still flagged.
+        let issues = run(
+            rules,
+            serde_json::json!({
+                "id": "Q1",
+                "descriptions": {"en": {"language":"en","value":"Acme Co."}}
+            }),
+            super::ends_with_punctuation,
+        );
+        assert_eq!(issues.len(), 1);
     }
 
     #[test]

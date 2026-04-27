@@ -46,6 +46,7 @@ pub struct CompiledRules {
 
     pub bad_starts_descriptions: Vec<String>,
     pub trademark_chars: Vec<String>,
+    pub ends_with_punctuation_exempt_suffixes: Vec<String>,
 
     pub marketing_imperatives: SubstringSet,
     pub promotional_substrings: SubstringSet,
@@ -72,6 +73,9 @@ impl CompiledRules {
             excluded_p31_for_long_aliases: rules.excluded_p31_for_long_aliases.clone(),
             bad_starts_descriptions: rules.bad_starts_descriptions.clone(),
             trademark_chars: rules.trademark_chars.clone(),
+            ends_with_punctuation_exempt_suffixes: rules
+                .ends_with_punctuation_exempt_suffixes
+                .clone(),
             marketing_imperatives: SubstringSet::new(rules.marketing_imperatives.iter().map(String::as_str))?,
             promotional_substrings: SubstringSet::new(rules.promotional_substrings.iter().map(String::as_str))?,
             promotional_exempt_lower: SubstringSet::new(promo_exempt_lower.iter().map(String::as_str))?,

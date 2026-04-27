@@ -2,14 +2,15 @@
 source: crates/wikidata-fix/tests/integration.rs
 expression: csv_str
 ---
-qid,Den,notes
-Q01,thing,description.starts_with_label
-Q02,the abandoned ship,description.misspelled
-Q03,Palestinian writer,description.starts_with_lowercase_nationality
-Q04,by an Irish person,description.contains_lowercase_nationality
-Q05,foo widget,description.contains_trademark
-Q06,AT&T thing,description.contains_html_entity
-Q07,foo bar baz,description.contains_double_space
-Q08,"foo,bar baz",description.space_before_comma
-Q09,foo bar baz,description.ends_with_punctuation
-Q17,foo bar baz,description.composite;description.contains_double_space;description.contains_trademark;description.ends_with_punctuation
+===== Den.csv =====
+qid,Den
+Q01,thing
+Q02,the abandoned ship
+Q03,Palestinian writer
+Q04,by an Irish person
+Q05,foo widget
+Q06,AT&T thing
+Q07,foo bar baz
+Q08,"foo,bar baz"
+Q09,foo bar baz
+Q17,foo bar baz
