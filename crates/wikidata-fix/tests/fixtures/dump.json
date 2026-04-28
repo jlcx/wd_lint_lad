@@ -16,5 +16,7 @@
 {"id":"Q15","descriptions":{"en":{"language":"en","value":"Obituary of foo"}}},
 {"id":"Q16","descriptions":{"en":{"language":"en","value":"x. The next"}}},
 {"id":"Q17","descriptions":{"en":{"language":"en","value":"foo® bar™  baz."}}},
-{"id":"Q18","claims":{"P31":[{"mainsnak":{"datavalue":{"value":{"id":"Q42"}}}}]},"aliases":{"en":[{"language":"en","value":"abbr"},{"language":"en","value":"a much longer alias"}]}}
+{"id":"Q18","claims":{"P31":[{"mainsnak":{"datavalue":{"value":{"id":"Q42"}}}}]},"aliases":{"en":[{"language":"en","value":"abbr"},{"language":"en","value":"a much longer alias"}]}},
+{"id":"Q19","descriptions":{"en":{"language":"en","value":"is a small bird"}}},
+{"id":"Q20","descriptions":{"en":{"language":"en","value":"is a Guinean-born musician"}}}
 ]

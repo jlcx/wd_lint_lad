@@ -25,6 +25,13 @@ pub struct Rules {
     /// not configured here.
     #[serde(default)]
     pub ends_with_punctuation_exempt_suffixes: Vec<String>,
+    /// Subset of `bad_starts_descriptions` that the fixer is allowed
+    /// to strip from the start of a description. Typically copular
+    /// phrases like "is a ", "was an "; articles ("A "/"The ") are
+    /// usually omitted because they're load-bearing for proper nouns.
+    /// Empty by default — no auto-stripping unless configured.
+    #[serde(default)]
+    pub bad_start_strip_prefixes: Vec<String>,
     pub thresholds: Thresholds,
 }
 

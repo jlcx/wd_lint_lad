@@ -21,7 +21,6 @@ pub const ALL: &[&str] = &[
     "description.contains_double_space",
     "description.contains_obituary",
     "description.space_before_comma",
-    "description.bad_start",
     "description.marketing_imperative",
     "description.promotional",
     "description.composite",
@@ -29,6 +28,11 @@ pub const ALL: &[&str] = &[
     "description.misspelled",
     "description.starts_with_lowercase_nationality",
     "description.contains_lowercase_nationality",
+    // bad_start is dispatched LAST among description checks so the
+    // strip runs after suggestion-based fixes (misspelled,
+    // starts_with_lowercase_nationality) that would otherwise clobber
+    // a prior strip with their original-derived suggestion.
+    "description.bad_start",
     "aliases.long",
     "descriptions.long",
 ];
@@ -103,9 +107,6 @@ pub fn run_all(entity: &Entity, ctx: &CheckCtx<'_>, out: &mut Vec<Issue>) {
     if e.contains("description.space_before_comma") {
         description::space_before_comma(entity, ctx, out);
     }
-    if e.contains("description.bad_start") {
-        description::bad_start(entity, ctx, out);
-    }
     if e.contains("description.marketing_imperative") {
         description::marketing_imperative(entity, ctx, out);
     }
@@ -126,6 +127,9 @@ pub fn run_all(entity: &Entity, ctx: &CheckCtx<'_>, out: &mut Vec<Issue>) {
     }
     if e.contains("description.contains_lowercase_nationality") {
         description::contains_lowercase_nationality(entity, ctx, out);
+    }
+    if e.contains("description.bad_start") {
+        description::bad_start(entity, ctx, out);
     }
 }
 

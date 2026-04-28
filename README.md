@@ -119,13 +119,13 @@ for `aliases.long`/`descriptions.long`, otherwise `null`.
 - `description.contains_trademark`
 - `description.ends_with_punctuation`
 - `description.starts_with_label`
+- `description.bad_start` (only when the prefix is in `bad_start_strip_prefixes`; others reject as `unstrippable_bad_start`)
 - `description.composite`
 
 **Detection-only** (reported, not auto-fixed):
 
 - `description.too_long`
 - `description.starts_capitalized`
-- `description.bad_start`
 - `description.marketing_imperative`
 - `description.promotional`
 - `description.multi_sentence`
@@ -181,12 +181,26 @@ Each post-fix value is rejected (routed to the unfixable report) if:
 If the post-fix value equals the original `value`, the cell is
 silently suppressed (no-op edits are not emitted).
 
+### Post-fix guideline check
+
+A description fix may correct one issue (a misspelling, an HTML
+entity) while leaving the description still violating other guideline
+rules — for example, a description that's both misspelled and starts
+with `"is a "`. After the safety pass, the result is checked against
+`bad_starts_descriptions`; if the post-fix value still starts with any
+listed prefix, the group is rejected with reason `post_fix_bad_start`.
+This prevents the fixer from emitting half-fixed values that would
+need a manual second pass.
+
+This is description-only. Labels and aliases aren't validated this way
+(no current fix targets them, and the convention is different).
+
 ### Unfixable report
 
 JSONL with each input record echoed verbatim plus a `"reason"` field.
 Reasons: `parse_error`, `detection_only`, `disabled`, `safety_bounds`,
 `control_chars`, `partial_html`, `nonperiod_punct`, `would_blank`,
-`composite_partial`.
+`composite_partial`, `post_fix_bad_start`.
 
 ## Typical pipeline against a full dump
 
@@ -198,7 +212,7 @@ between the two binaries.
 **Filter at the scanner** (simplest — half the work, smaller artifact):
 
 ```sh
-FIXABLE='description.misspelled,description.starts_with_lowercase_nationality,description.contains_lowercase_nationality,description.contains_html_entity,description.contains_double_space,description.space_before_comma,description.contains_trademark,description.ends_with_punctuation,description.starts_with_label,description.composite'
+FIXABLE='description.misspelled,description.starts_with_lowercase_nationality,description.contains_lowercase_nationality,description.contains_html_entity,description.contains_double_space,description.space_before_comma,description.contains_trademark,description.ends_with_punctuation,description.starts_with_label,description.bad_start,description.composite'
 
 zcat latest-all.json.gz \
   | ./target/release/wikidata-lint --rules rules/example.json --checks "$FIXABLE" --progress \
@@ -239,6 +253,7 @@ jq -c 'select(.check as $c | [
     "description.contains_trademark",
     "description.ends_with_punctuation",
     "description.starts_with_label",
+    "description.bad_start",
     "description.composite"
   ] | index($c))' issues.jsonl \
   | ./target/release/wikidata-fix --rules rules/example.json \
@@ -270,13 +285,35 @@ Notable knobs:
   Exceptions: `misspellings` (literal / lowercased / capfirst forms
   tried in order) and `promotional_exempt_substrings`
   (case-insensitive).
+- `bad_start_strip_prefixes` — subset of `bad_starts_descriptions` that
+  the fixer is allowed to strip from the start of a description.
+  Default in `rules/example.json` is the safe copular forms `"is an "`,
+  `"was an "`, `"is a "`, `"was a "`, `"are "`, `"were "`. Articles
+  (`"A "`, `"An "`, `"The "`) are deliberately omitted because they're
+  load-bearing for proper nouns ("The Beatles"). When the description
+  starts with a `bad_starts_descriptions` prefix that *isn't* in this
+  list, the post-fix guideline check rejects with
+  `post_fix_bad_start`. Stripping does *not* lowercase the first
+  character of the result, so proper-adjective starts like
+  "Guinean-born" survive intact. The scanner dispatches `bad_start`
+  *last* among description checks so it runs after the
+  suggestion-based fixes (`misspelled`,
+  `starts_with_lowercase_nationality`) that operate on the original
+  value — otherwise a misspelling fix would re-introduce the bad
+  start that `bad_start` had just stripped.
 - `ends_with_punctuation_exempt_suffixes` — literal end-of-description
   suffixes that exempt a value from `description.ends_with_punctuation`
   (e.g. `"Inc."`, `"Ltd."`, `"Jr."`). Case-sensitive end-of-string
-  match. Defaults to empty if omitted. Independent of this list, a
-  description ending with `)` whose `(`/`)` are balanced overall is
-  always exempt — common Wikidata pattern for disambiguation, e.g.
-  `"ABC (band)"`.
+  match. Defaults to empty if omitted. Independent of this list, two
+  structural exemptions are always on:
+  - **Balanced parens.** A description ending with `)` whose `(`/`)`
+    are balanced overall — common Wikidata disambiguation pattern, e.g.
+    `"ABC (band)"`.
+  - **Multi-period acronyms.** A description whose trailing
+    whitespace-bounded token matches `(<letter>.)+` with at least 2
+    letter+period pairs, e.g. `"R.O.C."`, `"U.S.A."`, `"e.g."`,
+    `"a.k.a."`. Single-trailing-period words like `"USA."` are *not*
+    exempt by this rule (they look more like sentence ends).
 
 ## Exit codes
 

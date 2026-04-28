@@ -5,7 +5,6 @@ expression: csv_str
 ===== Den.csv =====
 qid,Den
 Q01,thing
-Q02,the abandoned ship
 Q03,Palestinian writer
 Q04,by an Irish person
 Q05,foo widget
@@ -14,3 +13,5 @@ Q07,foo bar baz
 Q08,"foo,bar baz"
 Q09,foo bar baz
 Q17,foo bar baz
+Q19,small bird
+Q20,Guinean-born musician

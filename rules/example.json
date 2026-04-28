@@ -15,7 +15,15 @@
     "seperate": "separate",
     "untill": "until"
   },
-  "bad_starts_descriptions": ["a ", "an ", "the ", "It ", "is ", "http://"],
+  "bad_starts_descriptions": [
+    "a ", "an ", "the ",
+    "A ", "An ", "The ",
+    "It ", "is ", "was ", "are ", "were ",
+    "http://", "https://"
+  ],
+  "bad_start_strip_prefixes": [
+    "is an ", "was an ", "is a ", "was a ", "are ", "were "
+  ],
   "marketing_imperatives": ["Discover ", "Enjoy ", "Indulge ", "Buy "],
   "promotional_substrings": ["the best ", " finest ", "Christ-centered"],
   "promotional_exempt_substrings": ["award"],

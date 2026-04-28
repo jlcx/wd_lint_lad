@@ -13,13 +13,14 @@ use std::collections::{HashMap, HashSet};
 use serde::Serialize;
 use wd_core::{Field, Issue};
 
-use crate::fixes::{self, FixCtx, FixOutcome, LABEL_ALIAS_MAX_LEN};
+use crate::fixes::{self, FixCtx, FixOutcome, LABEL_ALIAS_MAX_LEN, PostFixCtx};
 
 /// Caller-supplied configuration for stage 1.
 pub struct ProcessConfig {
     pub fix_ctx: FixCtx,
     pub enabled_checks: HashSet<String>,
     pub description_max_len: usize,
+    pub post_fix_ctx: PostFixCtx,
 }
 
 #[derive(Debug)]
@@ -129,6 +130,12 @@ pub fn process(issues: Vec<Issue>, parse_failures: Vec<String>, config: &Process
             reject_group(&mut unfixable, g, "safety_bounds");
             continue;
         }
+        // Post-fix guideline check: don't emit half-fixed values that
+        // still trigger detection-only checks like `bad_start`.
+        if let Some(reason) = fixes::post_fix_violation(&g.working, g.field, &config.post_fix_ctx) {
+            reject_group(&mut unfixable, g, reason);
+            continue;
+        }
         if g.working == g.original {
             // No-op suppression — silent.
             suppressed_count += 1;
@@ -208,9 +215,11 @@ mod tests {
             fix_ctx: FixCtx {
                 nationalities: ["irish".to_string()].into_iter().collect(),
                 trademark_chars: vec!["™".into()],
+                bad_start_strip_prefixes: vec![],
             },
             enabled_checks: fixes::FIXABLE_CHECKS.iter().map(|s| (*s).to_string()).collect(),
             description_max_len: 140,
+            post_fix_ctx: PostFixCtx { bad_starts: vec![] },
         }
     }
 
@@ -334,6 +343,44 @@ mod tests {
         // Each cell carries its own (qid, column, value) — no sparse columns.
         assert!(r.cells.iter().any(|c| c.column == "Den" && c.value == "bb"));
         assert!(r.cells.iter().any(|c| c.column == "Den-gb" && c.value == "aa"));
+    }
+
+    #[test]
+    fn post_fix_bad_start_routes_to_unfixable() {
+        let mut cfg = config();
+        cfg.post_fix_ctx.bad_starts = vec!["the ".into(), "is ".into(), "A ".into()];
+
+        // Misspelling fix produces "the abandoned ship" — still bad_start.
+        let issues = vec![issue(
+            "Q1",
+            "en",
+            "description.misspelled",
+            "the abandonned ship",
+            Some("the abandoned ship"),
+        )];
+        let r = process(issues, vec![], &cfg);
+        assert!(r.cells.is_empty());
+        assert_eq!(r.unfixable.len(), 1);
+        match &r.unfixable[0] {
+            UnfixableEntry::Parsed { reason, .. } => assert_eq!(reason, "post_fix_bad_start"),
+            _ => panic!(),
+        }
+    }
+
+    #[test]
+    fn post_fix_validation_only_applies_to_descriptions() {
+        // Sanity: empty bad_starts means no rejection regardless of value.
+        let cfg = config();
+        let issues = vec![issue(
+            "Q1",
+            "en",
+            "description.misspelled",
+            "the abandonned ship",
+            Some("the abandoned ship"),
+        )];
+        let r = process(issues, vec![], &cfg);
+        assert_eq!(r.cells.len(), 1);
+        assert!(r.unfixable.is_empty());
     }
 
     #[test]

@@ -65,6 +65,12 @@ pub(super) fn pred_ends_with_punctuation(value: &str, exempt_suffixes: &[String]
     if last == ')' && has_balanced_parens(value) {
         return false;
     }
+    // Exemption: trailing token is a multi-period acronym, e.g. "R.O.C.",
+    // "U.S.A.", "i.e.", "e.g.". Detected structurally so users don't have
+    // to enumerate every possible initialism in the suffix list.
+    if last == '.' && trailing_token_is_acronym(value) {
+        return false;
+    }
     // Exemption: configured literal end-of-description suffixes,
     // e.g. "Inc.", "Ltd.", honorifics like "Jr.".
     if exempt_suffixes.iter().any(|s| value.ends_with(s.as_str())) {
@@ -88,6 +94,37 @@ fn has_balanced_parens(s: &str) -> bool {
         }
     }
     depth == 0
+}
+
+fn trailing_token_is_acronym(value: &str) -> bool {
+    value
+        .split_whitespace()
+        .next_back()
+        .is_some_and(is_acronym_token)
+}
+
+/// Matches strings of the form `(<ascii-letter>.)+` with at least 2
+/// letter+period pairs — i.e., classic dotted initialisms.
+fn is_acronym_token(token: &str) -> bool {
+    let bytes = token.as_bytes();
+    if bytes.len() < 4 {
+        // Need at least "X.Y." (2 pairs).
+        return false;
+    }
+    let mut i = 0;
+    let mut pairs = 0;
+    while i < bytes.len() {
+        if !bytes[i].is_ascii_alphabetic() {
+            return false;
+        }
+        i += 1;
+        if i >= bytes.len() || bytes[i] != b'.' {
+            return false;
+        }
+        i += 1;
+        pairs += 1;
+    }
+    pairs >= 2
 }
 
 pub(super) fn pred_bad_start(value: &str, prefixes: &[String]) -> bool {
@@ -752,6 +789,38 @@ mod tests {
             super::ends_with_punctuation,
         );
         assert_eq!(issues.len(), 1);
+    }
+
+    #[test]
+    fn ends_with_punctuation_exempts_dotted_acronyms() {
+        let cases = &[
+            // (description, expected_issue_count)
+            ("government of R.O.C.", 0),       // 3-pair acronym
+            ("ambassador to U.S.A.", 0),       // 3-pair
+            ("president of U.S.", 0),          // 2-pair
+            ("see e.g.", 0),                   // 2-pair lowercase
+            ("known as a.k.a.", 0),            // 3-pair lowercase
+            ("the USA.", 1),                   // single trailing period, no internal periods → still flagged
+            ("ends with U.", 1),               // single pair only → not enough, flagged
+            ("12.5.", 1),                      // digits, not letters → flagged
+            ("Foo R.O.C", 0),                  // doesn't end with '.' so check doesn't fire at all
+        ];
+        for (value, expected) in cases {
+            let issues = run(
+                empty_rules(),
+                serde_json::json!({
+                    "id": "Q1",
+                    "descriptions": {"en": {"language":"en","value": value}}
+                }),
+                super::ends_with_punctuation,
+            );
+            assert_eq!(
+                issues.len(),
+                *expected,
+                "value={value:?} expected {expected} got {}",
+                issues.len()
+            );
+        }
     }
 
     #[test]

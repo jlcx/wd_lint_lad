@@ -1,7 +1,7 @@
 {
   "nationalities_lower": ["palestinian", "irish"],
   "misspellings": {"abandonned": "abandoned"},
-  "bad_starts_descriptions": ["the ", "It "],
+  "bad_starts_descriptions": ["the ", "It ", "is "],
   "marketing_imperatives": ["Buy "],
   "promotional_substrings": ["the best "],
   "promotional_exempt_substrings": ["award"],
@@ -11,6 +11,7 @@
   "obituary_markers": ["Obituary"],
   "skip_qids": {},
   "excluded_p31_for_long_aliases": [],
+  "bad_start_strip_prefixes": ["is an ", "was an ", "is a ", "was a ", "are ", "were "],
   "thresholds": {
     "description_max_len": 50,
     "descgust_score_threshold": 4

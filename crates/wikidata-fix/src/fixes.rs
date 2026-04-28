@@ -20,6 +20,7 @@ pub const FIXABLE_CHECKS: &[&str] = &[
     "description.contains_trademark",
     "description.ends_with_punctuation",
     "description.starts_with_label",
+    "description.bad_start",
     "description.composite",
 ];
 
@@ -59,6 +60,37 @@ impl SkipReason {
 pub struct FixCtx {
     pub nationalities: HashSet<String>,
     pub trademark_chars: Vec<String>,
+    /// Sorted by length descending so longest match wins on prefix scan.
+    pub bad_start_strip_prefixes: Vec<String>,
+}
+
+/// Context for post-fix validation: the result of stage-1 coalescing
+/// is checked against these guideline rules before it's emitted. If
+/// any rule fires, the group is routed to the unfixable report rather
+/// than producing a half-fixed CSV row.
+pub struct PostFixCtx {
+    pub bad_starts: Vec<String>,
+}
+
+/// Returns `Some(reason)` when the post-fix value still violates a
+/// description guideline that the fix didn't (or couldn't) address;
+/// `None` when the value is clean.
+pub fn post_fix_violation(
+    value: &str,
+    field: wd_core::Field,
+    ctx: &PostFixCtx,
+) -> Option<&'static str> {
+    if !matches!(field, wd_core::Field::Description) {
+        return None;
+    }
+    if ctx
+        .bad_starts
+        .iter()
+        .any(|p| value.starts_with(p.as_str()))
+    {
+        return Some("post_fix_bad_start");
+    }
+    None
 }
 
 pub fn apply(check_id: &str, issue: &Issue, working: &str, ctx: &FixCtx) -> FixOutcome {
@@ -92,9 +124,39 @@ pub fn apply(check_id: &str, issue: &Issue, working: &str, ctx: &FixCtx) -> FixO
             Some(s) => FixOutcome::Applied(s),
             None => FixOutcome::Skipped(SkipReason::NonperiodPunct),
         },
+        "description.bad_start" => fix_bad_start(working, &ctx.bad_start_strip_prefixes),
         "description.composite" => fix_composite(issue, working, ctx),
         _ => FixOutcome::DetectionOnly,
     }
+}
+
+/// Strip a leading copular/safe prefix from the description.
+///
+/// `strip_prefixes` is expected to be sorted by length descending so
+/// longer patterns ("is an ") win against shorter ones ("is a ") when
+/// both technically match.
+///
+/// Idempotent on no-match: if no configured prefix matches the
+/// working value (either because a prior fix in the group already
+/// stripped it, or the prefix is one we don't safely strip like an
+/// article), this returns `Applied(unchanged)`. The post-fix
+/// `bad_start` guideline check runs afterward and rejects with
+/// `post_fix_bad_start` if the value still has a bad start.
+pub fn fix_bad_start(value: &str, strip_prefixes: &[String]) -> FixOutcome {
+    for prefix in strip_prefixes {
+        if value.starts_with(prefix.as_str()) {
+            let after = &value[prefix.len()..];
+            let trimmed = after.trim_start();
+            if trimmed.is_empty() {
+                return FixOutcome::Skipped(SkipReason::WouldBlank);
+            }
+            // No first-letter casing change: stripping "is a" from
+            // "is a Guinean-born ..." should leave "Guinean-born ..."
+            // with its proper-adjective capitalization intact.
+            return FixOutcome::Applied(trimmed.to_string());
+        }
+    }
+    FixOutcome::Applied(value.to_string())
 }
 
 // --- Per-check fix implementations ---
@@ -262,6 +324,7 @@ fn apply_subfix(check_id: &str, working: &str, ctx: &FixCtx) -> FixOutcome {
             Some(s) => FixOutcome::Applied(s),
             None => FixOutcome::Skipped(SkipReason::NonperiodPunct),
         },
+        "description.bad_start" => fix_bad_start(working, &ctx.bad_start_strip_prefixes),
         // starts_with_label needs the label, which the composite doesn't carry; treat
         // as detection-only at the composite level so the whole record routes to
         // composite_partial.
@@ -336,6 +399,7 @@ mod tests {
         let ctx = FixCtx {
             nationalities: HashSet::new(),
             trademark_chars: vec![],
+            bad_start_strip_prefixes: vec![],
         };
         match apply(&issue.check, &issue, &issue.value, &ctx) {
             FixOutcome::Applied(s) => assert_eq!(s, "foo, bar"),
@@ -375,6 +439,7 @@ mod tests {
         let ctx = FixCtx {
             nationalities: HashSet::new(),
             trademark_chars: vec![],
+            bad_start_strip_prefixes: vec![],
         };
         match apply(&issue.check, &issue, &issue.value, &ctx) {
             FixOutcome::Applied(s) => assert_eq!(s, "the abandoned ship"),
@@ -387,10 +452,10 @@ mod tests {
         let ctx = FixCtx {
             nationalities: HashSet::new(),
             trademark_chars: vec![],
+            bad_start_strip_prefixes: vec![],
         };
         for id in [
             "description.too_long",
-            "description.bad_start",
             "description.marketing_imperative",
             "description.promotional",
             "description.multi_sentence",
@@ -416,6 +481,50 @@ mod tests {
     }
 
     #[test]
+    fn fix_bad_start_strips_safe_prefix_and_preserves_capitalization() {
+        let prefixes = vec!["is a ".to_string()];
+        match fix_bad_start("is a thing", &prefixes) {
+            FixOutcome::Applied(s) => assert_eq!(s, "thing"),
+            other => panic!("unexpected {other:?}"),
+        }
+        // Proper-adjective capitalization is preserved (no lowerfirst).
+        match fix_bad_start("is a Guinean-born Canadian guitarist", &prefixes) {
+            FixOutcome::Applied(s) => assert_eq!(s, "Guinean-born Canadian guitarist"),
+            other => panic!("unexpected {other:?}"),
+        }
+    }
+
+    #[test]
+    fn fix_bad_start_longest_match_wins() {
+        // Sorted by length descending so "is an " wins against "is a ".
+        let prefixes = vec!["is an ".to_string(), "is a ".to_string()];
+        match fix_bad_start("is an apple", &prefixes) {
+            FixOutcome::Applied(s) => assert_eq!(s, "apple"),
+            other => panic!("unexpected {other:?}"),
+        }
+    }
+
+    #[test]
+    fn fix_bad_start_no_match_is_idempotent() {
+        // No-strip-prefix match → Applied(unchanged). Post-fix
+        // validation handles non-strippable bad starts separately.
+        let prefixes = vec!["is a ".to_string()];
+        match fix_bad_start("The Beatles", &prefixes) {
+            FixOutcome::Applied(s) => assert_eq!(s, "The Beatles"),
+            other => panic!("unexpected {other:?}"),
+        }
+    }
+
+    #[test]
+    fn fix_bad_start_would_blank_rejects() {
+        let prefixes = vec!["is a ".to_string()];
+        match fix_bad_start("is a ", &prefixes) {
+            FixOutcome::Skipped(SkipReason::WouldBlank) => {}
+            other => panic!("unexpected {other:?}"),
+        }
+    }
+
+    #[test]
     fn composite_applies_each_subfix_in_details_order() {
         let issue = Issue {
             qid: "Q1".into(),
@@ -434,6 +543,7 @@ mod tests {
         let ctx = FixCtx {
             nationalities: HashSet::new(),
             trademark_chars: vec!["™".into()],
+            bad_start_strip_prefixes: vec![],
         };
         match apply(&issue.check, &issue, &issue.value, &ctx) {
             FixOutcome::Applied(s) => assert_eq!(s, "Foo bar, baz"),
@@ -457,6 +567,7 @@ mod tests {
         let ctx = FixCtx {
             nationalities: HashSet::new(),
             trademark_chars: vec![],
+            bad_start_strip_prefixes: vec![],
         };
         match apply(&issue.check, &issue, &issue.value, &ctx) {
             FixOutcome::Skipped(SkipReason::CompositePartial) => {}

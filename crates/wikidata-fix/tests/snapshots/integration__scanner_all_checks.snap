@@ -33,3 +33,5 @@ expression: s
 {"qid":"Q17","lang":"en","field":"description","check":"description.composite","value":"foo® bar™  baz.","suggestion":null,"details":["description.ends_with_punctuation","description.contains_trademark","description.contains_double_space"]}
 {"qid":"Q18","lang":"en","field":"alias","check":"aliases.long","value":"abbr","suggestion":null,"details":{"new_max_len":4}}
 {"qid":"Q18","lang":"en","field":"alias","check":"aliases.long","value":"a much longer alias","suggestion":null,"details":{"new_max_len":19}}
+{"qid":"Q19","lang":"en","field":"description","check":"description.bad_start","value":"is a small bird","suggestion":null,"details":null}
+{"qid":"Q20","lang":"en","field":"description","check":"description.bad_start","value":"is a Guinean-born musician","suggestion":null,"details":null}

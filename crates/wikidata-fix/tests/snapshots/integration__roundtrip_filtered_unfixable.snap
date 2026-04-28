@@ -2,4 +2,7 @@
 source: crates/wikidata-fix/tests/integration.rs
 expression: unfixable_str
 ---
-
+{"qid":"Q02","lang":"en","field":"description","check":"description.bad_start","value":"the abandonned ship","suggestion":null,"details":null,"reason":"post_fix_bad_start"}
+{"qid":"Q02","lang":"en","field":"description","check":"description.misspelled","value":"the abandonned ship","suggestion":"the abandoned ship","details":null,"reason":"post_fix_bad_start"}
+{"qid":"Q12","lang":"en","field":"description","check":"description.bad_start","value":"the simple foo","suggestion":null,"details":null,"reason":"post_fix_bad_start"}
+{"qid":"Q14","lang":"en","field":"description","check":"description.bad_start","value":"the best widget around","suggestion":null,"details":null,"reason":"post_fix_bad_start"}

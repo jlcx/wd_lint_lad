@@ -11,6 +11,7 @@ description.space_before_comma,\
 description.contains_trademark,\
 description.ends_with_punctuation,\
 description.starts_with_label,\
+description.bad_start,\
 description.composite";
 
 fn fixtures_dir() -> PathBuf {

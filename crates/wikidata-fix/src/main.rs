@@ -13,7 +13,7 @@ use wd_core::Issue;
 
 use crate::cli::Cli;
 use crate::coalesce::{ProcessConfig, ProcessResult, UnfixableEntry};
-use crate::fixes::{FIXABLE_CHECKS, FixCtx};
+use crate::fixes::{FIXABLE_CHECKS, FixCtx, PostFixCtx};
 
 const EXIT_BAD_ARGS: u8 = 2;
 const EXIT_IO: u8 = 3;
@@ -37,15 +37,25 @@ fn main() -> ExitCode {
         }
     };
 
+    let mut bad_start_strip_prefixes = rules.bad_start_strip_prefixes.clone();
+    // Sort by length descending so longest match wins on prefix scan.
+    bad_start_strip_prefixes.sort_by_key(|s| std::cmp::Reverse(s.len()));
+
     let fix_ctx = FixCtx {
         nationalities: rules.nationalities_lower.iter().cloned().collect(),
         trademark_chars: rules.trademark_chars.clone(),
+        bad_start_strip_prefixes,
+    };
+
+    let post_fix_ctx = PostFixCtx {
+        bad_starts: rules.bad_starts_descriptions.clone(),
     };
 
     let config = ProcessConfig {
         fix_ctx,
         enabled_checks,
         description_max_len: rules.thresholds.description_max_len,
+        post_fix_ctx,
     };
 
     let stdin = io::stdin();
