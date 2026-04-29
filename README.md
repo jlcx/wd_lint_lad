@@ -155,6 +155,17 @@ sparse CSV.
 | `--disable <ids>` | none | Comma-separated check IDs to disable from the enabled set. |
 | `--unfixable <path>` | discard with stderr count | Path for the unfixable-report JSONL. |
 
+### Property records are skipped
+
+Records whose `qid` starts with `P` (Wikidata properties) are dropped
+silently before any fix is attempted — they don't appear in the CSV
+*or* in the unfixable report. Property descriptions follow conventions
+distinct from item descriptions ("with X as a string", etc.) and
+aren't worth auto-fixing. The fixer prints a one-line count of
+skipped property records to stderr so you can see how many were
+filtered. Lexemes (`L`-prefix) and other entity types still flow
+through normal processing.
+
 ### Coalescing
 
 The fixer groups input records by `(qid, lang, field)` and applies each
@@ -318,7 +329,7 @@ Notable knobs:
 - `ends_with_punctuation_exempt_suffixes` — literal end-of-description
   suffixes that exempt a value from `description.ends_with_punctuation`
   (e.g. `"Inc."`, `"Ltd."`, `"Jr."`). Case-sensitive end-of-string
-  match. Defaults to empty if omitted. Independent of this list, two
+  match. Defaults to empty if omitted. Independent of this list, three
   structural exemptions are always on:
   - **Balanced parens.** A description ending with `)` whose `(`/`)`
     are balanced overall — common Wikidata disambiguation pattern, e.g.
@@ -328,6 +339,11 @@ Notable knobs:
     letter+period pairs, e.g. `"R.O.C."`, `"U.S.A."`, `"e.g."`,
     `"a.k.a."`. Single-trailing-period words like `"USA."` are *not*
     exempt by this rule (they look more like sentence ends).
+  - **Trailing ellipsis.** A description whose final three or more
+    characters are consecutive ASCII periods, e.g. `"foo bar baz..."`
+    (truncation marker) or `"In the Woods..."` (band name). Two
+    trailing periods aren't exempt — usually a typo. The Unicode
+    ellipsis `"…"` is also exempt because it isn't ASCII punctuation.
 
 ## Exit codes
 

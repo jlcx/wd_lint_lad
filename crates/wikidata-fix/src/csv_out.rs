@@ -74,6 +74,7 @@ mod tests {
             ],
             unfixable: vec![],
             suppressed_count: 0,
+            skipped_property_count: 0,
         };
         write_split(dir.path(), &result).unwrap();
         let files = read_dir_sorted(dir.path());
@@ -91,6 +92,7 @@ mod tests {
             cells: vec![cell("Q01", "Den", "has, a comma")],
             unfixable: vec![],
             suppressed_count: 0,
+            skipped_property_count: 0,
         };
         write_split(dir.path(), &result).unwrap();
         let files = read_dir_sorted(dir.path());
@@ -105,6 +107,7 @@ mod tests {
             cells: vec![],
             unfixable: vec![],
             suppressed_count: 0,
+            skipped_property_count: 0,
         };
         write_split(dir.path(), &result).unwrap();
         assert_eq!(read_dir_sorted(dir.path()).len(), 0);
@@ -121,6 +124,7 @@ mod tests {
             ],
             unfixable: vec![],
             suppressed_count: 0,
+            skipped_property_count: 0,
         };
         write_split(dir.path(), &result).unwrap();
         let files = read_dir_sorted(dir.path());

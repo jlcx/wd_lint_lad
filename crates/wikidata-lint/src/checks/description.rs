@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use wd_core::{
     Details, Field, Issue,
     entity::{Entity, MonolingualText},
@@ -71,6 +73,13 @@ pub(super) fn pred_ends_with_punctuation(value: &str, exempt_suffixes: &[String]
     if last == '.' && trailing_token_is_acronym(value) {
         return false;
     }
+    // Exemption: trailing ellipsis ("..."). Sometimes a truncation marker,
+    // sometimes part of a name (e.g. the band "In the Woods..."). The
+    // Unicode ellipsis "…" (U+2026) is already exempt because it's not
+    // ASCII punctuation.
+    if last == '.' && ends_with_ascii_ellipsis(value) {
+        return false;
+    }
     // Exemption: configured literal end-of-description suffixes,
     // e.g. "Inc.", "Ltd.", honorifics like "Jr.".
     if exempt_suffixes.iter().any(|s| value.ends_with(s.as_str())) {
@@ -101,6 +110,17 @@ fn trailing_token_is_acronym(value: &str) -> bool {
         .split_whitespace()
         .next_back()
         .is_some_and(is_acronym_token)
+}
+
+/// True when the value ends with three or more consecutive ASCII
+/// periods — the classic ellipsis pattern, used as a truncation marker
+/// or as part of a name like the band "In the Woods..."
+fn ends_with_ascii_ellipsis(value: &str) -> bool {
+    let bytes = value.as_bytes();
+    bytes.len() >= 3
+        && bytes[bytes.len() - 1] == b'.'
+        && bytes[bytes.len() - 2] == b'.'
+        && bytes[bytes.len() - 3] == b'.'
 }
 
 /// Matches strings of the form `(<ascii-letter>.)+` with at least 2
@@ -150,16 +170,16 @@ pub fn too_long(entity: &Entity, ctx: &CheckCtx<'_>, out: &mut Vec<Issue>) {
     }
 }
 
-pub fn starts_with_label(entity: &Entity, _ctx: &CheckCtx<'_>, out: &mut Vec<Issue>) {
+pub fn starts_with_label(entity: &Entity, ctx: &CheckCtx<'_>, out: &mut Vec<Issue>) {
     for (lang, mt) in english_descs(entity) {
         if let Some(label) = label_for_lang(entity, lang)
-            && !label.is_empty()
-            && mt.value.starts_with(label)
+            && label_match_at_boundary(&mt.value, label).is_some()
         {
             // Pre-compute the canonical fix here so the fixer (which only
             // sees Issue records, not the entity) can apply it without
             // re-finding the label.
-            let suggestion = compute_starts_with_label_fix(&mt.value, label);
+            let suggestion =
+                compute_starts_with_label_fix(&mt.value, label, &ctx.compiled.nationalities);
             emit(
                 out,
                 entity,
@@ -173,20 +193,78 @@ pub fn starts_with_label(entity: &Entity, _ctx: &CheckCtx<'_>, out: &mut Vec<Iss
     }
 }
 
+/// Returns the slice of `value` after `label` *only when* `label` is a
+/// non-empty literal prefix and the character immediately after the
+/// label is a word boundary (whitespace, ASCII punctuation, or end of
+/// string).
+///
+/// This avoids orthographic false positives like "Korean family name"
+/// matching a label of "Ko".
+fn label_match_at_boundary<'a>(value: &'a str, label: &str) -> Option<&'a str> {
+    if label.is_empty() {
+        return None;
+    }
+    let after = value.strip_prefix(label)?;
+    let is_boundary = match after.chars().next() {
+        None => true,
+        Some(c) => c.is_whitespace() || c.is_ascii_punctuation(),
+    };
+    is_boundary.then_some(after)
+}
+
 /// Per SPEC §"description.starts_with_label" (fixer): strip the leading
 /// label, then any leading copular ("is a", "is an", "was a", "was an",
 /// "are", "were") that's followed by whitespace, then trim, then
-/// lowercase the first character.
+/// lowercase the first character — *unless* the first word is a proper
+/// adjective from the configured nationalities/proper-adjectives set,
+/// in which case its capitalization is preserved (so "is a Guinean-born
+/// musician" becomes "Guinean-born musician", not "guinean-born…").
+///
+/// Also strips leading separator punctuation (`,`/`;`/`:`/`-`/`–`/`—`)
+/// and surrounding whitespace immediately after the label, so a
+/// description shaped like `"Label, the rest"` doesn't leave `", the
+/// rest"` behind.
 ///
 /// Returns `None` ("would_blank") when the result is empty.
-fn compute_starts_with_label_fix(value: &str, label: &str) -> Option<String> {
-    let after_label = value.strip_prefix(label)?.trim_start();
+fn compute_starts_with_label_fix(
+    value: &str,
+    label: &str,
+    proper_adjectives: &HashSet<String>,
+) -> Option<String> {
+    let after_label = label_match_at_boundary(value, label)?;
+    let after_label = after_label.trim_start_matches(|c: char| {
+        c.is_whitespace() || matches!(c, ',' | ';' | ':' | '-' | '–' | '—')
+    });
     let after_copular = strip_copular_prefix(after_label);
     let trimmed = after_copular.trim();
     if trimmed.is_empty() {
         return None;
     }
-    Some(text::lowerfirst(trimmed))
+    if first_token_is_proper_adjective(trimmed, proper_adjectives) {
+        Some(trimmed.to_string())
+    } else {
+        Some(text::lowerfirst(trimmed))
+    }
+}
+
+/// Returns true when the first whitespace-bounded token of `s` —
+/// matched in either its full lowercase form or its first hyphen-half —
+/// is in `proper_adjectives`. This lets the fix preserve the original
+/// case of proper adjectives like `Guinean`, `Cambodian-born`, etc.
+fn first_token_is_proper_adjective(s: &str, proper_adjectives: &HashSet<String>) -> bool {
+    let Some(first) = s.split_whitespace().next() else {
+        return false;
+    };
+    let lower = first.to_lowercase();
+    if proper_adjectives.contains(&lower) {
+        return true;
+    }
+    if let Some((head, _tail)) = lower.split_once('-')
+        && proper_adjectives.contains(head)
+    {
+        return true;
+    }
+    false
 }
 
 fn strip_copular_prefix(s: &str) -> &str {
@@ -545,8 +623,7 @@ pub fn composite(entity: &Entity, ctx: &CheckCtx<'_>, out: &mut Vec<Issue>) {
             details.push("description.too_long".into());
         }
         if let Some(label) = label_for_lang(entity, lang)
-            && !label.is_empty()
-            && value.starts_with(label)
+            && label_match_at_boundary(value, label).is_some()
         {
             score += 1;
             details.push("description.starts_with_label".into());
@@ -653,6 +730,7 @@ mod tests {
 
     #[test]
     fn starts_with_label_suggestion_strips_label_copular_and_lowerfirsts() {
+        let nat: HashSet<String> = HashSet::new();
         let cases = &[
             // (value, label, expected_suggestion)
             ("Foo is a thing", "Foo", Some("thing")),
@@ -666,12 +744,112 @@ mod tests {
             ("Foo is alive", "Foo", Some("is alive")),
         ];
         for (value, label, expected) in cases {
-            let got = compute_starts_with_label_fix(value, label);
+            let got = compute_starts_with_label_fix(value, label, &nat);
             assert_eq!(
                 got.as_deref(),
                 *expected,
                 "value={value:?} label={label:?}",
             );
+        }
+    }
+
+    #[test]
+    fn starts_with_label_requires_word_boundary_after_label() {
+        // The label "Ko" is an orthographic prefix of "Korean" but
+        // "Korean" doesn't have a word boundary after the "Ko". The
+        // check must NOT fire.
+        let issues = run(
+            empty_rules(),
+            serde_json::json!({
+                "id": "Q1",
+                "labels": {"en": {"language":"en","value":"Ko"}},
+                "descriptions": {"en": {"language":"en","value":"Korean family name"}}
+            }),
+            super::starts_with_label,
+        );
+        assert!(issues.is_empty(), "no boundary after 'Ko' — must not fire");
+
+        // With a space boundary, the check fires.
+        let issues = run(
+            empty_rules(),
+            serde_json::json!({
+                "id": "Q1",
+                "labels": {"en": {"language":"en","value":"Ko"}},
+                "descriptions": {"en": {"language":"en","value":"Ko Korean family name"}}
+            }),
+            super::starts_with_label,
+        );
+        assert_eq!(issues.len(), 1);
+
+        // With a punctuation boundary, the check fires.
+        let issues = run(
+            empty_rules(),
+            serde_json::json!({
+                "id": "Q1",
+                "labels": {"en": {"language":"en","value":"Ko"}},
+                "descriptions": {"en": {"language":"en","value":"Ko, Korean family name"}}
+            }),
+            super::starts_with_label,
+        );
+        assert_eq!(issues.len(), 1);
+
+        // Description equals label exactly — end-of-string also counts as a boundary.
+        // (Suggestion will be `None` since stripping leaves nothing — would-blank.)
+        let issues = run(
+            empty_rules(),
+            serde_json::json!({
+                "id": "Q1",
+                "labels": {"en": {"language":"en","value":"Ko"}},
+                "descriptions": {"en": {"language":"en","value":"Ko"}}
+            }),
+            super::starts_with_label,
+        );
+        assert_eq!(issues.len(), 1);
+        assert!(issues[0].suggestion.is_none());
+    }
+
+    #[test]
+    fn starts_with_label_preserves_case_for_proper_adjective_first_word() {
+        let nat: HashSet<String> = ["guinean".into(), "cambodian".into()]
+            .into_iter()
+            .collect();
+        let cases = &[
+            // First word in nat → preserve.
+            ("Foo is a Cambodian writer", "Foo", Some("Cambodian writer")),
+            // Hyphen-half match → preserve.
+            ("Foo, is a Guinean-born musician", "Foo", Some("Guinean-born musician")),
+            // Not in nat → lowerfirst (existing behavior).
+            ("Foo is a Doctor", "Foo", Some("doctor")),
+            ("Foo is a teacher", "Foo", Some("teacher")),
+        ];
+        for (value, label, expected) in cases {
+            let got = compute_starts_with_label_fix(value, label, &nat);
+            assert_eq!(
+                got.as_deref(),
+                *expected,
+                "value={value:?} label={label:?}",
+            );
+        }
+    }
+
+    #[test]
+    fn starts_with_label_strips_leading_separator_punctuation() {
+        let nat: HashSet<String> = HashSet::new();
+        let cases = &[
+            // (value, label, expected_suggestion)
+            ("Foo, famous writer", "Foo", Some("famous writer")),
+            ("Foo; the next thing", "Foo", Some("the next thing")),
+            ("Foo: composer", "Foo", Some("composer")),
+            ("Foo - artist", "Foo", Some("artist")),
+            ("Foo – author", "Foo", Some("author")),    // en-dash
+            ("Foo — author", "Foo", Some("author")),    // em-dash
+            ("Foo,is a thing", "Foo", Some("thing")),    // comma + copular together
+            // Empty proper-adjective set → first-word lowerfirst always applies.
+            ("Foo, is a Guinean-born guitarist", "Foo", Some("guinean-born guitarist")),
+        ];
+        for (value, label, expected) in cases {
+            let got = compute_starts_with_label_fix(value, label, &nat);
+            assert_eq!(got.as_deref(), *expected, "value={value:?} label={label:?}");
         }
     }
 
@@ -789,6 +967,34 @@ mod tests {
             super::ends_with_punctuation,
         );
         assert_eq!(issues.len(), 1);
+    }
+
+    #[test]
+    fn ends_with_punctuation_exempts_trailing_ellipsis() {
+        let cases = &[
+            // (description, expected_issue_count)
+            ("In the Woods...", 0),       // band name with trailing ellipsis
+            ("foo bar baz...", 0),        // truncation marker, 3 dots
+            ("foo....", 0),               // 4 dots also exempt
+            ("foo..", 1),                 // 2 dots — typo, still flags
+            ("foo.", 1),                  // single period, still flags
+        ];
+        for (value, expected) in cases {
+            let issues = run(
+                empty_rules(),
+                serde_json::json!({
+                    "id": "Q1",
+                    "descriptions": {"en": {"language":"en","value": value}}
+                }),
+                super::ends_with_punctuation,
+            );
+            assert_eq!(
+                issues.len(),
+                *expected,
+                "value={value:?} expected {expected} got {}",
+                issues.len()
+            );
+        }
     }
 
     #[test]

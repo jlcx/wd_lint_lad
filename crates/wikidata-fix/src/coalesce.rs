@@ -31,6 +31,10 @@ pub struct ProcessResult {
     pub cells: Vec<CellOut>,
     pub unfixable: Vec<UnfixableEntry>,
     pub suppressed_count: usize,
+    /// Records dropped because their qid starts with `P` (property
+    /// entities). Property descriptions follow conventions distinct
+    /// from item descriptions; we don't try to mechanically fix them.
+    pub skipped_property_count: usize,
 }
 
 #[derive(Debug, Clone)]
@@ -66,6 +70,23 @@ struct GroupState {
 }
 
 pub fn process(issues: Vec<Issue>, parse_failures: Vec<String>, config: &ProcessConfig) -> ProcessResult {
+    // Filter out property entities (P-prefix). Property descriptions
+    // follow different conventions from item descriptions, and we
+    // don't try to auto-fix them. They're silently dropped rather
+    // than routed to the unfixable report.
+    let mut skipped_property_count = 0usize;
+    let issues: Vec<Issue> = issues
+        .into_iter()
+        .filter(|i| {
+            if i.qid.starts_with('P') {
+                skipped_property_count += 1;
+                false
+            } else {
+                true
+            }
+        })
+        .collect();
+
     // Stage 1 — group + apply fixes per group, preserving group input order.
     let mut groups: Vec<GroupState> = Vec::new();
     let mut group_index: HashMap<(String, String, Field), usize> = HashMap::new();
@@ -152,6 +173,7 @@ pub fn process(issues: Vec<Issue>, parse_failures: Vec<String>, config: &Process
         cells,
         unfixable,
         suppressed_count,
+        skipped_property_count,
     }
 }
 
@@ -381,6 +403,32 @@ mod tests {
         let r = process(issues, vec![], &cfg);
         assert_eq!(r.cells.len(), 1);
         assert!(r.unfixable.is_empty());
+    }
+
+    #[test]
+    fn property_records_are_silently_skipped() {
+        let issues = vec![
+            issue(
+                "P31",
+                "en",
+                "description.misspelled",
+                "with a abandonned thing",
+                Some("with a abandoned thing"),
+            ),
+            issue(
+                "Q5",
+                "en",
+                "description.misspelled",
+                "another abandonned thing",
+                Some("another abandoned thing"),
+            ),
+        ];
+        let r = process(issues, vec![], &config());
+        // Q5 still produces a cell; P31 is dropped (not in cells, not in unfixable).
+        assert_eq!(r.cells.len(), 1);
+        assert_eq!(r.cells[0].qid, "Q5");
+        assert!(r.unfixable.is_empty());
+        assert_eq!(r.skipped_property_count, 1);
     }
 
     #[test]

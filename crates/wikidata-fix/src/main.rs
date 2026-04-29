@@ -89,6 +89,12 @@ fn main() -> ExitCode {
     if result.suppressed_count > 0 {
         eprintln!("suppressed {} no-op records", result.suppressed_count);
     }
+    if result.skipped_property_count > 0 {
+        eprintln!(
+            "skipped {} property records (P-prefix; properties aren't auto-fixed)",
+            result.skipped_property_count
+        );
+    }
 
     ExitCode::SUCCESS
 }
