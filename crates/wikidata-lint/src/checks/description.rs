@@ -123,12 +123,14 @@ fn ends_with_ascii_ellipsis(value: &str) -> bool {
         && bytes[bytes.len() - 3] == b'.'
 }
 
-/// Matches strings of the form `(<ascii-letter>.)+` with at least 2
-/// letter+period pairs — i.e., classic dotted initialisms.
+/// Matches strings of the form `(<ascii-letter>.)+` with at least one
+/// letter+period pair. Covers both classic dotted initialisms
+/// (`R.O.C.`, `i.e.`, `e.g.`) and the single-letter-initial pattern
+/// (`Boney M.`, `Jon B.`).
 fn is_acronym_token(token: &str) -> bool {
     let bytes = token.as_bytes();
-    if bytes.len() < 4 {
-        // Need at least "X.Y." (2 pairs).
+    if bytes.len() < 2 {
+        // Need at least "X." (1 pair).
         return false;
     }
     let mut i = 0;
@@ -144,7 +146,7 @@ fn is_acronym_token(token: &str) -> bool {
         i += 1;
         pairs += 1;
     }
-    pairs >= 2
+    pairs >= 1
 }
 
 pub(super) fn pred_bad_start(value: &str, prefixes: &[String]) -> bool {
@@ -998,7 +1000,7 @@ mod tests {
     }
 
     #[test]
-    fn ends_with_punctuation_exempts_dotted_acronyms() {
+    fn ends_with_punctuation_exempts_dotted_acronyms_and_single_letter_initials() {
         let cases = &[
             // (description, expected_issue_count)
             ("government of R.O.C.", 0),       // 3-pair acronym
@@ -1006,8 +1008,12 @@ mod tests {
             ("president of U.S.", 0),          // 2-pair
             ("see e.g.", 0),                   // 2-pair lowercase
             ("known as a.k.a.", 0),            // 3-pair lowercase
+            // Single-letter initials — band/personal-name pattern like
+            // "Boney M.", "Jon B.", "Tom W.".
+            ("German pop group Boney M.", 0),
+            ("singer Jon B.", 0),
+            ("the W.", 0),
             ("the USA.", 1),                   // single trailing period, no internal periods → still flagged
-            ("ends with U.", 1),               // single pair only → not enough, flagged
             ("12.5.", 1),                      // digits, not letters → flagged
             ("Foo R.O.C", 0),                  // doesn't end with '.' so check doesn't fire at all
         ];

@@ -270,16 +270,19 @@ pub fn strip_trademark_chars(value: &str, chars: &[String]) -> String {
     s
 }
 
-/// Returns `Some(stripped)` when the value ends in `.`/`!`/`?`,
+/// Returns `Some(stripped)` when the value ends in `.` or `?`,
 /// `Some(unchanged)` when there's no trailing punctuation at all
 /// (lenient no-op; used so coalesced fixes after a prior strip don't
-/// reject), and `None` only when there's a non-period trailing
-/// punctuation that the spec says we won't touch.
+/// reject), and `None` for any other trailing ASCII punctuation —
+/// including `!`, which we deliberately don't auto-strip because
+/// trailing `!` is too often part of a band/stage name (`!!!`,
+/// `Against Me!`, `Empire! Empire!`, `Haloo Helsinki!`, etc.) for the
+/// fix to be safely automated.
 pub fn strip_trailing_period(value: &str) -> Option<String> {
     let Some(last) = value.chars().next_back() else {
         return Some(value.to_string());
     };
-    if matches!(last, '.' | '!' | '?') {
+    if matches!(last, '.' | '?') {
         let mut s = value.to_string();
         s.pop();
         Some(s)
@@ -357,10 +360,13 @@ mod tests {
     }
 
     #[test]
-    fn strip_trailing_period_only_for_period_bang_question() {
+    fn strip_trailing_period_only_for_period_and_question_mark() {
         assert_eq!(strip_trailing_period("foo."), Some("foo".to_string()));
-        assert_eq!(strip_trailing_period("foo!"), Some("foo".to_string()));
         assert_eq!(strip_trailing_period("foo?"), Some("foo".to_string()));
+        // `!` is no longer auto-stripped — too many band names end with
+        // it ("!!!", "Against Me!", "Empire! Empire!", etc.). Routes
+        // to unfixable for human review.
+        assert_eq!(strip_trailing_period("foo!"), None);
         // Other punctuation → reject (caller routes to unfixable).
         assert_eq!(strip_trailing_period("foo,"), None);
         assert_eq!(strip_trailing_period("foo)"), None);

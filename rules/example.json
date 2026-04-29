@@ -137,7 +137,8 @@
     "Inc.", "Ltd.", "Corp.", "Co.", "LLC.", "PLC.",
     "Jr.", "Sr.", "St.", "Dr.", "Mr.", "Mrs.", "Ms.", "Prof.",
     "etc.", "et al.",
-    "U.S.", "U.K.", "U.S.S.R.", "U.A.E."
+    "U.S.", "U.K.", "U.S.S.R.", "U.A.E.",
+    "moe.", "Clipping.", "clipping."
   ],
   "thresholds": {
     "description_max_len": 140,

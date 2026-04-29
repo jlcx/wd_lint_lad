@@ -108,6 +108,13 @@ for `aliases.long`/`descriptions.long`, otherwise `null`.
 
 ### Available checks
 
+Note: trailing `!` is detected but **not auto-stripped**. Too many
+band/stage names end with `!` (`!!!`, `Against Me!`, `Empire! Empire!`,
+`¡Mayday!`, `Haloo Helsinki!`, ...) for the fix to be safe to
+automate. Records ending with `!` flag as `description.ends_with_punctuation`
+and route to the unfixable report with reason `nonperiod_punct` for
+human review. Only `.` and `?` are auto-stripped.
+
 **Fixable** (the fixer can mechanically correct these):
 
 - `description.misspelled`
@@ -334,11 +341,14 @@ Notable knobs:
   - **Balanced parens.** A description ending with `)` whose `(`/`)`
     are balanced overall — common Wikidata disambiguation pattern, e.g.
     `"ABC (band)"`.
-  - **Multi-period acronyms.** A description whose trailing
-    whitespace-bounded token matches `(<letter>.)+` with at least 2
-    letter+period pairs, e.g. `"R.O.C."`, `"U.S.A."`, `"e.g."`,
-    `"a.k.a."`. Single-trailing-period words like `"USA."` are *not*
-    exempt by this rule (they look more like sentence ends).
+  - **Dotted-acronym / single-letter-initial.** A description whose
+    trailing whitespace-bounded token matches `(<letter>.)+` with at
+    least one letter+period pair. Covers classic dotted initialisms
+    (`"R.O.C."`, `"U.S.A."`, `"e.g."`, `"a.k.a."`) *and* the
+    Firstname-L. pattern (`"Boney M."`, `"Jon B."`). Single-trailing-
+    period words like `"USA."` are *not* exempt by this rule (the
+    token has no letter-period pair structure — they look more like
+    sentence ends).
   - **Trailing ellipsis.** A description whose final three or more
     characters are consecutive ASCII periods, e.g. `"foo bar baz..."`
     (truncation marker) or `"In the Woods..."` (band name). Two
