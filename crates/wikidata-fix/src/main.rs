@@ -42,7 +42,14 @@ fn main() -> ExitCode {
     bad_start_strip_prefixes.sort_by_key(|s| std::cmp::Reverse(s.len()));
 
     let fix_ctx = FixCtx {
-        nationalities: rules.nationalities_lower.iter().cloned().collect(),
+        // Union nationalities_lower and proper_adjectives_lower into a
+        // single capitalize-this-token set; both feed the same fixes.
+        nationalities: rules
+            .nationalities_lower
+            .iter()
+            .chain(rules.proper_adjectives_lower.iter())
+            .cloned()
+            .collect(),
         trademark_chars: rules.trademark_chars.clone(),
         bad_start_strip_prefixes,
     };

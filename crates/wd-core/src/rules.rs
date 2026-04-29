@@ -6,6 +6,15 @@ use std::{fs, io};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Rules {
     pub nationalities_lower: Vec<String>,
+    /// Additional lowercase tokens that should be capitalized in
+    /// descriptions, beyond strict country/demonym terms — e.g.,
+    /// continent adjectives ("european", "african") and religious
+    /// adjectives ("christian", "muslim"). Merged with
+    /// `nationalities_lower` at runtime; the two lists are treated as
+    /// a single set by both `description.starts_with_lowercase_nationality`
+    /// and `description.contains_lowercase_nationality`. Empty by default.
+    #[serde(default)]
+    pub proper_adjectives_lower: Vec<String>,
     pub misspellings: HashMap<String, String>,
     pub bad_starts_descriptions: Vec<String>,
     pub marketing_imperatives: Vec<String>,

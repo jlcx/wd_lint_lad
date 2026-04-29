@@ -83,7 +83,14 @@ impl CompiledRules {
             multi_sentence_markers: SubstringSet::new(rules.multi_sentence_markers.iter().map(String::as_str))?,
             obituary_markers: SubstringSet::new(rules.obituary_markers.iter().map(String::as_str))?,
             misspellings: rules.misspellings.clone(),
-            nationalities: rules.nationalities_lower.iter().cloned().collect(),
+            // Union the two configured lists into a single runtime set:
+            // both lists feed the same nationality/proper-adjective checks.
+            nationalities: rules
+                .nationalities_lower
+                .iter()
+                .chain(rules.proper_adjectives_lower.iter())
+                .cloned()
+                .collect(),
         })
     }
 

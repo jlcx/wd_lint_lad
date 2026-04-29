@@ -285,6 +285,20 @@ Notable knobs:
   Exceptions: `misspellings` (literal / lowercased / capfirst forms
   tried in order) and `promotional_exempt_substrings`
   (case-insensitive).
+- `nationalities_lower` and `proper_adjectives_lower` are merged into
+  a single runtime set by both
+  `description.starts_with_lowercase_nationality` and
+  `description.contains_lowercase_nationality`. They're separate
+  config fields purely for organizational clarity:
+  `nationalities_lower` for countries, demonyms, and nationality-
+  prefix forms (`anglo`, `indo`, `sino`, ...); `proper_adjectives_lower`
+  for the broader "should be capitalized in English" category —
+  continents (`european`, `asian`, ...), religions (`christian`,
+  `muslim`, ...), or anything else you'd capitalize. Either list
+  alone is sufficient — the split is an organizing convenience.
+  The check IDs both still contain "nationality" for backwards
+  compatibility; their actual meaning is "lowercase token that
+  should be capitalized."
 - `bad_start_strip_prefixes` — subset of `bad_starts_descriptions` that
   the fixer is allowed to strip from the start of a description.
   Default in `rules/example.json` is the safe copular forms `"is an "`,
