@@ -1,7 +1,8 @@
-# wikidata-lint / wikidata-fix
+# wd_lint_lad
 
-Two Rust binaries that scan a Wikidata JSON dump for issues in
-**labels**, **descriptions**, and **aliases**, then turn the fixable
+This tool consists of two Rust binaries, `wikidata-lint` and `wikidata-fix`, 
+that scan a Wikidata JSON dump for issues in
+**labels**, **aliases**, and **descriptions**, then turn the fixable
 findings into a [QuickStatements v2 / CSV][qs] batch.
 
 Detection rules (word lists, prefix lists, misspelling maps, QID/PID
