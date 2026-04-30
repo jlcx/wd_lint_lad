@@ -580,19 +580,28 @@ pub fn contains_lowercase_nationality(
     for (lang, mt) in english_descs(entity) {
         let value = &mt.value;
         let mut tokens = value.split_whitespace();
-        let _first = tokens.next();
+        let Some(first) = tokens.next() else {
+            continue;
+        };
+        let mut prev = first;
         let mut hit = false;
         for token in tokens {
-            if nat.contains(token) {
-                hit = true;
-                break;
+            // Skip tokens immediately following an uppercase-initial word.
+            // Handles binomial nomenclature ("Aspergillus niger") where the
+            // species epithet is correctly lowercase after a capitalised genus.
+            if !prev.starts_with(|c: char| c.is_uppercase()) {
+                if nat.contains(token) {
+                    hit = true;
+                    break;
+                }
+                // Per SPEC: also split a single-hyphen token and check halves.
+                let parts: Vec<&str> = token.split('-').collect();
+                if parts.len() == 2 && (nat.contains(parts[0]) || nat.contains(parts[1])) {
+                    hit = true;
+                    break;
+                }
             }
-            // Per SPEC: also split a single-hyphen token and check halves.
-            let parts: Vec<&str> = token.split('-').collect();
-            if parts.len() == 2 && (nat.contains(parts[0]) || nat.contains(parts[1])) {
-                hit = true;
-                break;
-            }
+            prev = token;
         }
         if hit {
             emit(
@@ -1283,7 +1292,7 @@ mod tests {
 
         // First token — must NOT trigger this check
         let issues = run(
-            rules,
+            rules.clone(),
             serde_json::json!({
                 "id": "Q1",
                 "descriptions": {"en": {"language":"en","value":"irish writer"}}
@@ -1291,6 +1300,32 @@ mod tests {
             super::contains_lowercase_nationality,
         );
         assert!(issues.is_empty());
+
+        // Token after an uppercase-initial word — binomial name exemption.
+        // "niger" is a nationality token but legitimately lowercase as a
+        // species epithet after a capitalised genus like "Aspergillus".
+        let mut rules2 = empty_rules();
+        rules2.nationalities_lower = vec!["niger".into()];
+        let issues = run(
+            rules2.clone(),
+            serde_json::json!({
+                "id": "Q1",
+                "descriptions": {"en": {"language":"en","value":"strain of Aspergillus niger"}}
+            }),
+            super::contains_lowercase_nationality,
+        );
+        assert!(issues.is_empty(), "niger after Aspergillus must not fire");
+
+        // Same token after a lowercase word still fires.
+        let issues = run(
+            rules2,
+            serde_json::json!({
+                "id": "Q1",
+                "descriptions": {"en": {"language":"en","value":"politician from niger"}}
+            }),
+            super::contains_lowercase_nationality,
+        );
+        assert_eq!(issues.len(), 1, "niger after lowercase word must fire");
     }
 
     #[test]
