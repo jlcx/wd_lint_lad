@@ -7,7 +7,7 @@ findings into a [QuickStatements v2 / CSV][qs] batch.
 Detection rules (word lists, prefix lists, misspelling maps, QID/PID
 skiplists, length thresholds, etc.) live in an external JSON rules file
 so they can be tuned without recompiling. See
-[`rules/example.json`](rules/example.json) for the canonical shape and
+[`rules/en.json`](rules/en.json) for the canonical shape and
 [`SPEC.md`](SPEC.md) for the detailed specification of every check.
 
 ```
@@ -65,7 +65,7 @@ Scan the full dump with all checks enabled:
 
 ```sh
 zcat latest-all.json.gz \
-  | wikidata-lint --rules rules/example.json --progress \
+  | wikidata-lint --rules rules/en.json --progress \
   > issues.jsonl
 ```
 
@@ -73,7 +73,7 @@ Scan only specific checks:
 
 ```sh
 zcat latest-all.json.gz \
-  | wikidata-lint --rules rules/example.json \
+  | wikidata-lint --rules rules/en.json \
       --checks description.misspelled,description.composite \
   > issues.jsonl
 ```
@@ -82,7 +82,7 @@ Write to a file rather than stdout:
 
 ```sh
 zcat latest-all.json.gz \
-  | wikidata-lint --rules rules/example.json --output issues.jsonl --progress
+  | wikidata-lint --rules rules/en.json --output issues.jsonl --progress
 ```
 
 ### Output
@@ -233,10 +233,10 @@ between the two binaries.
 FIXABLE='description.misspelled,description.starts_with_lowercase_nationality,description.contains_lowercase_nationality,description.contains_html_entity,description.contains_double_space,description.space_before_comma,description.contains_trademark,description.ends_with_punctuation,description.starts_with_label,description.bad_start,description.composite'
 
 zcat latest-all.json.gz \
-  | ./target/release/wikidata-lint --rules rules/example.json --checks "$FIXABLE" --progress \
+  | ./target/release/wikidata-lint --rules rules/en.json --checks "$FIXABLE" --progress \
   > fixable.jsonl
 
-./target/release/wikidata-fix --rules rules/example.json \
+./target/release/wikidata-fix --rules rules/en.json \
     --output-dir batches/ \
     --unfixable skipped.jsonl \
   < fixable.jsonl
@@ -253,7 +253,7 @@ review; useful when you also want detection-only findings):
 
 ```sh
 zcat latest-all.json.gz \
-  | ./target/release/wikidata-lint --rules rules/example.json --progress \
+  | ./target/release/wikidata-lint --rules rules/en.json --progress \
   > issues.jsonl
 
 # Sample / inspect
@@ -274,7 +274,7 @@ jq -c 'select(.check as $c | [
     "description.bad_start",
     "description.composite"
   ] | index($c))' issues.jsonl \
-  | ./target/release/wikidata-fix --rules rules/example.json \
+  | ./target/release/wikidata-fix --rules rules/en.json \
       --output-dir batches/ \
       --unfixable skipped.jsonl
 ```
@@ -284,7 +284,7 @@ batches — `grep`, `jq`, sort, hand-edit, drop rows you don't want.
 
 ## Rules file
 
-A single JSON document; see [`rules/example.json`](rules/example.json)
+A single JSON document; see [`rules/en.json`](rules/en.json)
 for the canonical shape and [`SPEC.md` §"Rules file schema"](SPEC.md)
 for field-by-field semantics. The same file is used by both binaries.
 
@@ -319,7 +319,7 @@ Notable knobs:
   should be capitalized."
 - `bad_start_strip_prefixes` — subset of `bad_starts_descriptions` that
   the fixer is allowed to strip from the start of a description.
-  Default in `rules/example.json` is the safe copular forms `"is an "`,
+  Default in `rules/en.json` is the safe copular forms `"is an "`,
   `"was an "`, `"is a "`, `"was a "`, `"are "`, `"were "`. Articles
   (`"A "`, `"An "`, `"The "`) are deliberately omitted because they're
   load-bearing for proper nouns ("The Beatles"). When the description
@@ -374,7 +374,7 @@ becomes the wall-clock bottleneck before the scanner does. Consider:
 
 ```sh
 pigz -dc latest-all.json.gz \
-  | ./target/release/wikidata-lint --rules rules/example.json --progress \
+  | ./target/release/wikidata-lint --rules rules/en.json --progress \
   > issues.jsonl
 ```
 
