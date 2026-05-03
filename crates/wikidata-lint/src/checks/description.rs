@@ -1,5 +1,3 @@
-use std::collections::HashSet;
-
 use wd_core::{
     Details, Field, Issue,
     entity::{Entity, MonolingualText},
@@ -172,7 +170,7 @@ pub fn too_long(entity: &Entity, ctx: &CheckCtx<'_>, out: &mut Vec<Issue>) {
     }
 }
 
-pub fn starts_with_label(entity: &Entity, ctx: &CheckCtx<'_>, out: &mut Vec<Issue>) {
+pub fn starts_with_label(entity: &Entity, _ctx: &CheckCtx<'_>, out: &mut Vec<Issue>) {
     for (lang, mt) in english_descs(entity) {
         if let Some(label) = label_for_lang(entity, lang)
             && label_match_at_boundary(&mt.value, label).is_some()
@@ -180,8 +178,7 @@ pub fn starts_with_label(entity: &Entity, ctx: &CheckCtx<'_>, out: &mut Vec<Issu
             // Pre-compute the canonical fix here so the fixer (which only
             // sees Issue records, not the entity) can apply it without
             // re-finding the label.
-            let suggestion =
-                compute_starts_with_label_fix(&mt.value, label, &ctx.compiled.nationalities);
+            let suggestion = compute_starts_with_label_fix(&mt.value, label);
             emit(
                 out,
                 entity,
@@ -214,13 +211,10 @@ fn label_match_at_boundary<'a>(value: &'a str, label: &str) -> Option<&'a str> {
     is_boundary.then_some(after)
 }
 
-/// Per SPEC §"description.starts_with_label" (fixer): strip the leading
-/// label, then any leading copular ("is a", "is an", "was a", "was an",
-/// "are", "were") that's followed by whitespace, then trim, then
-/// lowercase the first character — *unless* the first word is a proper
-/// adjective from the configured nationalities/proper-adjectives set,
-/// in which case its capitalization is preserved (so "is a Guinean-born
-/// musician" becomes "Guinean-born musician", not "guinean-born…").
+/// Strip the leading label, then any leading copular ("is a", "is an",
+/// "was a", "was an", "are", "were") followed by whitespace, then trim.
+/// Capitalization of what remains is left untouched — changing case is
+/// unsafe because the first surviving word may be a proper noun.
 ///
 /// Also strips leading separator punctuation (`,`/`;`/`:`/`-`/`–`/`—`)
 /// and surrounding whitespace immediately after the label, so a
@@ -228,11 +222,7 @@ fn label_match_at_boundary<'a>(value: &'a str, label: &str) -> Option<&'a str> {
 /// rest"` behind.
 ///
 /// Returns `None` ("would_blank") when the result is empty.
-fn compute_starts_with_label_fix(
-    value: &str,
-    label: &str,
-    proper_adjectives: &HashSet<String>,
-) -> Option<String> {
+fn compute_starts_with_label_fix(value: &str, label: &str) -> Option<String> {
     let after_label = label_match_at_boundary(value, label)?;
     let after_label = after_label.trim_start_matches(|c: char| {
         c.is_whitespace() || matches!(c, ',' | ';' | ':' | '-' | '–' | '—')
@@ -242,31 +232,7 @@ fn compute_starts_with_label_fix(
     if trimmed.is_empty() {
         return None;
     }
-    if first_token_is_proper_adjective(trimmed, proper_adjectives) {
-        Some(trimmed.to_string())
-    } else {
-        Some(text::lowerfirst(trimmed))
-    }
-}
-
-/// Returns true when the first whitespace-bounded token of `s` —
-/// matched in either its full lowercase form or its first hyphen-half —
-/// is in `proper_adjectives`. This lets the fix preserve the original
-/// case of proper adjectives like `Guinean`, `Cambodian-born`, etc.
-fn first_token_is_proper_adjective(s: &str, proper_adjectives: &HashSet<String>) -> bool {
-    let Some(first) = s.split_whitespace().next() else {
-        return false;
-    };
-    let lower = first.to_lowercase();
-    if proper_adjectives.contains(&lower) {
-        return true;
-    }
-    if let Some((head, _tail)) = lower.split_once('-')
-        && proper_adjectives.contains(head)
-    {
-        return true;
-    }
-    false
+    Some(trimmed.to_string())
 }
 
 fn strip_copular_prefix(s: &str) -> &str {
@@ -740,22 +706,22 @@ mod tests {
     }
 
     #[test]
-    fn starts_with_label_suggestion_strips_label_copular_and_lowerfirsts() {
-        let nat: HashSet<String> = HashSet::new();
+    fn starts_with_label_suggestion_strips_label_and_copular() {
         let cases = &[
             // (value, label, expected_suggestion)
             ("Foo is a thing", "Foo", Some("thing")),
             ("Foo IS A book", "Foo", Some("book")),
             ("Foo was an author", "Foo", Some("author")),
             ("Foo bar", "Foo", Some("bar")),
-            ("Foo Bar", "Foo", Some("bar")),
+            // Capitalization of the surviving word is preserved — not lowered.
+            ("Foo Bar", "Foo", Some("Bar")),
             ("Foo", "Foo", None), // would-blank
             ("Foo are runners", "Foo", Some("runners")),
-            // "is a" requires trailing whitespace; "alive" doesn't qualify, so nothing is stripped.
+            // "is a" requires trailing whitespace; "alive" doesn't qualify.
             ("Foo is alive", "Foo", Some("is alive")),
         ];
         for (value, label, expected) in cases {
-            let got = compute_starts_with_label_fix(value, label, &nat);
+            let got = compute_starts_with_label_fix(value, label);
             assert_eq!(
                 got.as_deref(),
                 *expected,
@@ -820,21 +786,17 @@ mod tests {
     }
 
     #[test]
-    fn starts_with_label_preserves_case_for_proper_adjective_first_word() {
-        let nat: HashSet<String> = ["guinean".into(), "cambodian".into()]
-            .into_iter()
-            .collect();
+    fn starts_with_label_preserves_case_of_remaining_text() {
+        // Capitalization is never changed — proper nouns, proper adjectives,
+        // and ordinary words all survive with their original case.
         let cases = &[
-            // First word in nat → preserve.
             ("Foo is a Cambodian writer", "Foo", Some("Cambodian writer")),
-            // Hyphen-half match → preserve.
             ("Foo, is a Guinean-born musician", "Foo", Some("Guinean-born musician")),
-            // Not in nat → lowerfirst (existing behavior).
-            ("Foo is a Doctor", "Foo", Some("doctor")),
+            ("Foo is a Doctor", "Foo", Some("Doctor")),
             ("Foo is a teacher", "Foo", Some("teacher")),
         ];
         for (value, label, expected) in cases {
-            let got = compute_starts_with_label_fix(value, label, &nat);
+            let got = compute_starts_with_label_fix(value, label);
             assert_eq!(
                 got.as_deref(),
                 *expected,
@@ -845,7 +807,6 @@ mod tests {
 
     #[test]
     fn starts_with_label_strips_leading_separator_punctuation() {
-        let nat: HashSet<String> = HashSet::new();
         let cases = &[
             // (value, label, expected_suggestion)
             ("Foo, famous writer", "Foo", Some("famous writer")),
@@ -854,12 +815,12 @@ mod tests {
             ("Foo - artist", "Foo", Some("artist")),
             ("Foo – author", "Foo", Some("author")),    // en-dash
             ("Foo — author", "Foo", Some("author")),    // em-dash
-            ("Foo,is a thing", "Foo", Some("thing")),    // comma + copular together
-            // Empty proper-adjective set → first-word lowerfirst always applies.
-            ("Foo, is a Guinean-born guitarist", "Foo", Some("guinean-born guitarist")),
+            ("Foo,is a thing", "Foo", Some("thing")),   // comma + copular together
+            // Case is preserved regardless of whether the first word is a known nationality.
+            ("Foo, is a Guinean-born guitarist", "Foo", Some("Guinean-born guitarist")),
         ];
         for (value, label, expected) in cases {
-            let got = compute_starts_with_label_fix(value, label, &nat);
+            let got = compute_starts_with_label_fix(value, label);
             assert_eq!(got.as_deref(), *expected, "value={value:?} label={label:?}");
         }
     }
