@@ -4,7 +4,9 @@ use wd_core::{Issue, entity::Entity};
 
 use crate::matchers::CompiledRules;
 
+pub mod alias;
 pub mod description;
+pub mod label;
 pub mod streaming;
 
 /// Every check ID this scanner knows about. Order matches the spec.
@@ -26,6 +28,7 @@ pub const ALL: &[&str] = &[
     "description.composite",
     "description.multi_sentence",
     "description.misspelled",
+    "description.misspelled_advisory",
     "description.starts_with_lowercase_nationality",
     "description.contains_lowercase_nationality",
     // bad_start is dispatched LAST among description checks so the
@@ -35,6 +38,9 @@ pub const ALL: &[&str] = &[
     "description.bad_start",
     "aliases.long",
     "descriptions.long",
+    "label.wrong_script",
+    "alias.wrong_script",
+    "description.mostly_foreign_script",
 ];
 
 #[derive(Debug, Clone)]
@@ -122,6 +128,9 @@ pub fn run_all(entity: &Entity, ctx: &CheckCtx<'_>, out: &mut Vec<Issue>) {
     if e.contains("description.misspelled") {
         description::misspelled(entity, ctx, out);
     }
+    if e.contains("description.misspelled_advisory") {
+        description::misspelled_advisory(entity, ctx, out);
+    }
     if e.contains("description.starts_with_lowercase_nationality") {
         description::starts_with_lowercase_nationality(entity, ctx, out);
     }
@@ -130,6 +139,15 @@ pub fn run_all(entity: &Entity, ctx: &CheckCtx<'_>, out: &mut Vec<Issue>) {
     }
     if e.contains("description.bad_start") {
         description::bad_start(entity, ctx, out);
+    }
+    if e.contains("label.wrong_script") {
+        label::wrong_script(entity, ctx, out);
+    }
+    if e.contains("alias.wrong_script") {
+        alias::wrong_script(entity, ctx, out);
+    }
+    if e.contains("description.mostly_foreign_script") {
+        description::mostly_foreign_script(entity, ctx, out);
     }
 }
 

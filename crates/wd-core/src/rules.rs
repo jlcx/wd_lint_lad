@@ -16,6 +16,14 @@ pub struct Rules {
     #[serde(default)]
     pub proper_adjectives_lower: Vec<String>,
     pub misspellings: HashMap<String, String>,
+    /// Detection-only counterpart to `misspellings`. Same `wrong → right`
+    /// mapping shape, but matches on these keys are flagged via
+    /// `description.misspelled_advisory` and never auto-applied by the
+    /// fixer. Use this for keys where the "wrong" form is also a real
+    /// surname, valid regional spelling, or otherwise plausible
+    /// non-misspelling.
+    #[serde(default)]
+    pub misspellings_advisory: HashMap<String, String>,
     pub bad_starts_descriptions: Vec<String>,
     pub marketing_imperatives: Vec<String>,
     pub promotional_substrings: Vec<String>,
@@ -41,6 +49,13 @@ pub struct Rules {
     /// Empty by default — no auto-stripping unless configured.
     #[serde(default)]
     pub bad_start_strip_prefixes: Vec<String>,
+    /// Maps language codes to expected script names (currently only
+    /// `"latin"` is defined). Used by `label.wrong_script`,
+    /// `alias.wrong_script`, and `description.mostly_foreign_script`.
+    /// Lookup is hierarchical: `"en-gb"` falls back to `"en"` if not
+    /// present. Empty by default.
+    #[serde(default)]
+    pub script_policies: HashMap<String, String>,
     pub thresholds: Thresholds,
 }
 

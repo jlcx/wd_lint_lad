@@ -138,6 +138,17 @@ human review. Only `.` and `?` are auto-stripped.
 - `description.promotional`
 - `description.multi_sentence`
 - `description.contains_obituary`
+- `description.misspelled_advisory` — like `description.misspelled` but
+  driven by the `misspellings_advisory` map for entries where the
+  "wrong" form is also a real surname or valid regional spelling.
+  A suggestion is included for human review; the fixer never applies it.
+- `description.mostly_foreign_script` — fires when the majority of
+  alphabetic characters in the description are not in the script
+  configured for the language (see `script_policies`).
+- `label.wrong_script` — fires when a label for a configured language
+  has predominantly non-matching script characters (e.g. CJK characters
+  in an English label).
+- `alias.wrong_script` — same as above, per-alias.
 - `aliases.long`
 - `descriptions.long`
 
@@ -304,6 +315,20 @@ Notable knobs:
   Exceptions: `misspellings` (literal / lowercased / capfirst forms
   tried in order) and `promotional_exempt_substrings`
   (case-insensitive).
+- `misspellings_advisory` — same shape as `misspellings`
+  (`wrong → right` map, same lookup order). Hits emit
+  `description.misspelled_advisory` and are never auto-applied by
+  the fixer. Use this for keys whose "wrong" form is also a real
+  surname (e.g. `Sargent`, `Playright`), a valid regional spelling
+  (`judgement`), or a valid distinct word (`lightening`). The
+  suggestion ships with the issue so a human reviewer sees the
+  proposed correction; the check ID just signals "do not auto-apply."
+- `script_policies` — maps language codes to expected script names
+  (currently only `"latin"` is recognised). Drives `label.wrong_script`,
+  `alias.wrong_script`, and `description.mostly_foreign_script`.
+  Lookup is hierarchical: `"en-gb"` falls back to `"en"` if the
+  subtag isn't configured directly. A language with no policy entry
+  is silently skipped by all three checks.
 - `nationalities_lower` and `proper_adjectives_lower` are merged into
   a single runtime set by both
   `description.starts_with_lowercase_nationality` and

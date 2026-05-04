@@ -1,7 +1,7 @@
 use wd_core::{
     Details, Field, Issue,
     entity::{Entity, MonolingualText},
-    is_english, text,
+    is_english, script::is_predominantly_non_latin, text,
 };
 
 use super::CheckCtx;
@@ -163,6 +163,29 @@ pub fn too_long(entity: &Entity, ctx: &CheckCtx<'_>, out: &mut Vec<Issue>) {
                 lang,
                 &mt.value,
                 "description.too_long",
+                None,
+                None,
+            );
+        }
+    }
+}
+
+/// Advisory-only: fires when the majority of alphabetic characters in
+/// a description are not in the expected script for the language.
+/// Uses the same hierarchical script-policy lookup as the label/alias
+/// checks so all three checks share a single configuration knob.
+pub fn mostly_foreign_script(entity: &Entity, ctx: &CheckCtx<'_>, out: &mut Vec<Issue>) {
+    for (lang, mt) in &entity.descriptions {
+        let Some(script) = ctx.compiled.script_for_lang(lang) else {
+            continue;
+        };
+        if script == "latin" && is_predominantly_non_latin(&mt.value) {
+            emit(
+                out,
+                entity,
+                lang,
+                &mt.value,
+                "description.mostly_foreign_script",
                 None,
                 None,
             );
@@ -459,7 +482,34 @@ pub fn multi_sentence(entity: &Entity, ctx: &CheckCtx<'_>, out: &mut Vec<Issue>)
 }
 
 pub fn misspelled(entity: &Entity, ctx: &CheckCtx<'_>, out: &mut Vec<Issue>) {
-    let map = &ctx.compiled.misspellings;
+    run_misspelling_check(
+        entity,
+        &ctx.compiled.misspellings,
+        "description.misspelled",
+        out,
+    );
+}
+
+/// Detection-only twin of `misspelled` that reads the advisory map and
+/// emits `description.misspelled_advisory`. Same lookup semantics; the
+/// distinct check ID lets the fixer route hits to the unfixable report
+/// (where they're surfaced for human review with a suggested correction)
+/// instead of auto-applying them.
+pub fn misspelled_advisory(entity: &Entity, ctx: &CheckCtx<'_>, out: &mut Vec<Issue>) {
+    run_misspelling_check(
+        entity,
+        &ctx.compiled.misspellings_advisory,
+        "description.misspelled_advisory",
+        out,
+    );
+}
+
+fn run_misspelling_check(
+    entity: &Entity,
+    map: &std::collections::HashMap<String, String>,
+    check_id: &str,
+    out: &mut Vec<Issue>,
+) {
     if map.is_empty() {
         return;
     }
@@ -494,15 +544,7 @@ pub fn misspelled(entity: &Entity, ctx: &CheckCtx<'_>, out: &mut Vec<Issue>) {
             suggestion.push_str(seg);
         }
         if matched {
-            emit(
-                out,
-                entity,
-                lang,
-                value,
-                "description.misspelled",
-                Some(suggestion),
-                None,
-            );
+            emit(out, entity, lang, value, check_id, Some(suggestion), None);
         }
     }
 }
@@ -1206,6 +1248,67 @@ mod tests {
         );
         assert_eq!(issues.len(), 1);
         assert_eq!(issues[0].suggestion.as_deref(), Some("Abandoned ship"));
+    }
+
+    #[test]
+    fn misspelled_advisory_fires_on_advisory_map_only() {
+        let mut rules = empty_rules();
+        rules
+            .misspellings_advisory
+            .insert("playright".into(), "playwright".into());
+
+        // Hits via advisory check.
+        let issues = run(
+            rules.clone(),
+            serde_json::json!({
+                "id": "Q1",
+                "descriptions": {"en": {"language":"en","value":"the playright lived in Bath"}}
+            }),
+            super::misspelled_advisory,
+        );
+        assert_eq!(issues.len(), 1);
+        assert_eq!(issues[0].check, "description.misspelled_advisory");
+        assert_eq!(
+            issues[0].suggestion.as_deref(),
+            Some("the playwright lived in Bath")
+        );
+
+        // Same input, regular check — must NOT fire.
+        let issues = run(
+            rules,
+            serde_json::json!({
+                "id": "Q1",
+                "descriptions": {"en": {"language":"en","value":"the playright lived in Bath"}}
+            }),
+            super::misspelled,
+        );
+        assert!(issues.is_empty(), "advisory entry must not appear in regular misspelled");
+    }
+
+    #[test]
+    fn misspelled_does_not_fire_on_moved_advisory_keys() {
+        // Regression guard: keys that moved to `misspellings_advisory`
+        // must not appear in the regular `misspellings` map. Read the
+        // shipped rules file and assert each removed key is absent.
+        let json = std::fs::read_to_string(
+            std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("../../rules/en.json"),
+        )
+        .expect("rules/en.json should be present at workspace root");
+        let rules: Rules = serde_json::from_str(&json).unwrap();
+        for key in [
+            "amatuer", "colum", "freind", "judgement", "kernal",
+            "lightening", "momento", "playright", "sargent",
+        ] {
+            assert!(
+                !rules.misspellings.contains_key(key),
+                "{key:?} must be advisory-only, not in misspellings"
+            );
+            assert!(
+                rules.misspellings_advisory.contains_key(key),
+                "{key:?} should be present in misspellings_advisory"
+            );
+        }
     }
 
     #[test]

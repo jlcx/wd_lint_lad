@@ -56,7 +56,13 @@ pub struct CompiledRules {
     pub obituary_markers: SubstringSet,
 
     pub misspellings: HashMap<String, String>,
+    /// Detection-only sibling of `misspellings`. Drives the
+    /// `description.misspelled_advisory` check.
+    pub misspellings_advisory: HashMap<String, String>,
     pub nationalities: HashSet<String>,
+    /// Maps language codes to expected script names. Queried via
+    /// `script_for_lang` which applies hierarchical subtag fallback.
+    pub script_policies: HashMap<String, String>,
 }
 
 impl CompiledRules {
@@ -83,6 +89,7 @@ impl CompiledRules {
             multi_sentence_markers: SubstringSet::new(rules.multi_sentence_markers.iter().map(String::as_str))?,
             obituary_markers: SubstringSet::new(rules.obituary_markers.iter().map(String::as_str))?,
             misspellings: rules.misspellings.clone(),
+            misspellings_advisory: rules.misspellings_advisory.clone(),
             // Union the two configured lists into a single runtime set:
             // both lists feed the same nationality/proper-adjective checks.
             nationalities: rules
@@ -91,11 +98,27 @@ impl CompiledRules {
                 .chain(rules.proper_adjectives_lower.iter())
                 .cloned()
                 .collect(),
+            script_policies: rules.script_policies.clone(),
         })
     }
 
     pub fn skip_qids_for(&self, key: &str) -> Option<&HashSet<String>> {
         self.skip_qids.get(key)
+    }
+
+    /// Returns the expected script name for `lang`, applying hierarchical
+    /// subtag fallback.  `"en-gb"` → tries `"en-gb"`, then `"en"`.
+    pub fn script_for_lang(&self, lang: &str) -> Option<&str> {
+        let mut code = lang;
+        loop {
+            if let Some(s) = self.script_policies.get(code) {
+                return Some(s.as_str());
+            }
+            match code.rfind('-') {
+                Some(pos) => code = &code[..pos],
+                None => return None,
+            }
+        }
     }
 }
 

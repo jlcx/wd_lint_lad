@@ -110,7 +110,6 @@
     "agressive": "aggressive",
     "allegaince": "allegiance",
     "allmost": "almost",
-    "amatuer": "amateur",
     "anually": "annually",
     "apparant": "apparent",
     "arguement": "argument",
@@ -164,7 +163,6 @@
     "flourescent": "fluorescent",
     "foriegn": "foreign",
     "fourty": "forty",
-    "freind": "friend",
     "garantee": "guarantee",
     "gratefull": "grateful",
     "guage": "gauge",
@@ -183,7 +181,6 @@
     "innoculate": "inoculate",
     "inteligence": "intelligence",
     "jewelery": "jewelry",
-    "kernal": "kernel",
     "liesure": "leisure",
     "liason": "liaison",
     "libary": "library",
@@ -196,7 +193,6 @@
     "miniscule": "minuscule",
     "mischievious": "mischievous",
     "mispell": "misspell",
-    "momento": "memento",
     "neccessary": "necessary",
     "neice": "niece",
     "nieghbor": "neighbor",
@@ -214,7 +210,6 @@
     "perseverence": "perseverance",
     "personell": "personnel",
     "plagerize": "plagiarize",
-    "playright": "playwright",
     "posession": "possession",
     "potatos": "potatoes",
     "preceed": "precede",
@@ -261,6 +256,17 @@
     "withold": "withhold",
     "writting": "writing"
   },
+  "misspellings_advisory": {
+    "amatuer": "amateur",
+    "colum": "column",
+    "freind": "friend",
+    "judgement": "judgment",
+    "kernal": "kernel",
+    "lightening": "lightning",
+    "momento": "memento",
+    "playright": "playwright",
+    "sargent": "sergeant"
+  },
   "bad_starts_descriptions": [
     "a ", "an ", "the ",
     "A ", "An ", "The ",
@@ -294,6 +300,9 @@
     "U.S.", "U.K.", "U.S.S.R.", "U.A.E.",
     "moe.", "Clipping.", "clipping.", "Into It. Over It."
   ],
+  "script_policies": {
+    "en": "latin"
+  },
   "thresholds": {
     "description_max_len": 140,
     "descgust_score_threshold": 4
